@@ -1,0 +1,56 @@
+binary_sensor:
+  # Physical Button A
+  - platform: gpio
+    name: "Button A"
+    id: button_a
+    pin:
+      number: ${button_a_gpio}
+      mode: INPUT_PULLUP
+      inverted: true
+      ignore_strapping_warning: false
+
+    filters:
+      - delayed_on: ${filter_delay_on}
+      - delayed_off: ${filter_delay_off}
+    
+    on_multi_click:
+      # single click detection
+      - timing:
+        - ${timing_click_1}
+        - ${timing_click_2}
+        then:
+          - homeassistant.event:
+              event: esphome.on_gesture
+              data:
+                button: A
+                gesture: single_click
+
+      # double click detection
+      - timing:
+          - ${timing_double_click_1}
+          - ${timing_double_click_2}
+          - ${timing_double_click_3}
+          - ${timing_double_click_4}
+        then:
+          - homeassistant.event:
+              event: esphome.on_gesture
+              data:
+                button: A
+                gesture: double_click
+
+      # hold detection
+      - timing:
+          - ${timing_hold}
+        then:
+          - while:
+              condition:
+                binary_sensor.is_on: button_a
+              then:
+                - light.toggle: led_status
+                - homeassistant.event:
+                    event: esphome.on_gesture
+                    data:
+                      button: A
+                      gesture: button_hold
+                - delay: ${timing_hold_repeat}
+          - light.turn_off: led_status

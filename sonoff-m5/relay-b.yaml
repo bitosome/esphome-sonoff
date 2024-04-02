@@ -1,0 +1,7 @@
+switch:
+  # Physical GPIO Relay
+  - platform: gpio
+    name: "Relay B"
+    pin: ${relay_b_gpio}
+    id: relay_b
+    restore_mode: RESTORE_DEFAULT_OFF
