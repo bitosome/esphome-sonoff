@@ -58,7 +58,6 @@ packages:
       - sonoff-m5/button-b.yaml
 
 switch:
-    
   # Modify behavior of imported Relay B
   - id: !extend relay_b
     on_turn_on:
@@ -67,7 +66,6 @@ switch:
     - switch.turn_off: led_indicator
 
 binary_sensor:
-
   # Button A
   - id: !extend button_a
     on_press:

@@ -62,7 +62,6 @@ switch:
     - switch.turn_off: led_indicator
 
 binary_sensor:
-
   # Button A
   - id: !extend button_a
     pin:

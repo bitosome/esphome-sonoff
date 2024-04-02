@@ -15,7 +15,6 @@ time:
 
 # Diagnostic output sensors
 text_sensor:
-
   - platform: wifi_info
     ip_address:
       id: ip_address
