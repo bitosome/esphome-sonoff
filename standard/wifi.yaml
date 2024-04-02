@@ -28,7 +28,7 @@ wifi:
   power_save_mode: none
   ssid: "${wifi_ssid}"
   password: "${wifi_password}"
-  use_address: "${device_ip}"
+  #use_address: "${device_ip}"
 
   # Enable fallback hotspot (captive portal) in case wi-fi connection fails
   ap:

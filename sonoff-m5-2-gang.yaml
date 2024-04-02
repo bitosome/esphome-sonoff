@@ -5,7 +5,7 @@ substitutions:
   device_type_code: "light-switch"
   device_type_name: "light switch"
   device_number: "1"
-  device_ip: "0.0.0.0"
+  #device_ip: "0.0.0.0"
 
   # Project Substitutions (not intended for user substitution)
   device_model: "Switchman M5 (2-Gang)"
