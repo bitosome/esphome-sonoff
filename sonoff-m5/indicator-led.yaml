@@ -1,7 +1,7 @@
 # Allow importing this package
-dashboard_import:
-  package_import_url: "github://bitosome/esphome/sonoff-m5/indicator-led.yaml@main"
-  import_full_config: false
+#dashboard_import:
+  #package_import_url: "github://bitosome/esphome/sonoff-m5/indicator-led.yaml@main"
+  #import_full_config: false
 
 switch:
   # Physical indicator of the relay
