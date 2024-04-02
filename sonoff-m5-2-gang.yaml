@@ -1,10 +1,6 @@
 substitutions:
-  # User-required substitutions
-  device_location_code: "outdoor"
-  device_location_name: "Outdoor"
-  device_type_code: "light-switch"
-  device_type_name: "light switch"
-  device_number: "1"
+  device_friendly_name: ""
+  device_name: ""
   #device_ip: "0.0.0.0"
 
   # Project Substitutions (not intended for user substitution)
