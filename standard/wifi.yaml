@@ -36,3 +36,6 @@ wifi:
     password: "${wifi_password}"
 
 captive_portal:
+
+web_server:
+  port: 80
