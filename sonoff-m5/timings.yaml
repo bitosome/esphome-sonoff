@@ -5,14 +5,14 @@ substitutions:
   filter_delay_off: 50ms
 
   # Single Click Timings
-  timing_click_1: ON for at most 1s #400ms
-  timing_click_2: OFF for at least 0.5s #600ms
+  timing_click_1: ON for at most 400ms
+  timing_click_2: OFF for at least 600ms
   
   # Double Click Timings
-  timing_double_click_1: ON for at most 1s #500ms
-  timing_double_click_2: OFF for at most 1s #400ms
-  timing_double_click_3: ON for at most 1s #500ms
-  timing_double_click_4: OFF for at least 0.2s #250ms
+  timing_double_click_1: ON for at most 500ms
+  timing_double_click_2: OFF for at most 400ms
+  timing_double_click_3: ON for at most 500ms
+  timing_double_click_4: OFF for at least 250ms
 
   # Button Hold Timings
   timing_hold: ON for at least 1s
