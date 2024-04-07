@@ -7,7 +7,7 @@ substitutions:
   device_model: "Switchman M5 (2-Gang)"
   device_make: "Sonoff"
   package_version: "0.0.1"
-  package_url: "github://bitosome/esphome/sonoff-m5-2-gang.yaml@main"
+  package_url: "github://bitosome/esphome/sonoff/sonoff-m5-2-gang.yaml@main"
 
   # Relay Configurations
   relay_a_gpio: GPIO23
@@ -28,7 +28,7 @@ dashboard_import:
 # Import packages
 packages:
   standard_package:
-    url: https://github.com/bitosome/esphome/
+    url: https://github.com/bitosome/esphome/sonoff/
     ref: main
     refresh: 0d
     files:
@@ -37,7 +37,7 @@ packages:
       - standard/wifi.yaml
       - standard/internaltemp.yaml
   sonoffm5_package:
-    url: https://github.com/bitosome/esphome/
+    url: https://github.com/bitosome/esphome/sonoff/
     ref: main
     refresh: 0d
     files:

@@ -1,6 +1,6 @@
 # Allow importing this package
 dashboard_import:
-  package_import_url: "github://bitosome/esphome/sonoff-m5/indicator-led.yaml@main"
+  package_import_url: "github://bitosome/esphome/sonoff/sonoff-m5/indicator-led.yaml@main"
   import_full_config: false
 
 switch:
