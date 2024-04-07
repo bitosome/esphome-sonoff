@@ -1,6 +1,6 @@
 substitutions:
-  device_friendly_name: "Office light switch 2"
-  device_name: "office-light-switch-2"
+  device_friendly_name: ""
+  device_name: ""
   #device_ip: "0.0.0.0"
 
   # Project Substitutions (not intended for user substitution)

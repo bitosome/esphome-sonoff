@@ -15,15 +15,15 @@ binary_sensor:
     
     on_multi_click:
       # single click detection
-      - timing:
-        - ${timing_click_1}
-        - ${timing_click_2}
-        then:
-          - homeassistant.event:
-              event: esphome.on_gesture
-              data:
-                button: C
-                gesture: single_click
+      # - timing:
+      #   - ${timing_click_1}
+      #   - ${timing_click_2}
+      #   then:
+      #     - homeassistant.event:
+      #         event: esphome.on_gesture
+      #         data:
+      #           button: C
+      #           gesture: single_click
 
       # double click detection
       - timing:
