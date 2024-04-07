@@ -14,7 +14,7 @@ binary_sensor:
       - delayed_off: ${filter_delay_off}
     
     on_multi_click:
-      single click detection
+      # single click detection
       - timing:
         - ${timing_click_1}
         - ${timing_click_2}
