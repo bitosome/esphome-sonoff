@@ -1,15 +1,15 @@
-light:
-  # Physical pin to the connection status LED
-  # We don't expose this to the HA UI (internal)
-  - platform: status_led
-    name: "LED"
-    id: led_status
-    pin:
-      number: GPIO05
-      inverted: true
-      ignore_strapping_warning: true
-    internal: true
-    restore_mode: RESTORE_DEFAULT_ON
+# light:
+#   # Physical pin to the connection status LED
+#   # We don't expose this to the HA UI (internal)
+#   - platform: status_led
+#     name: "LED"
+#     id: led_status
+#     pin:
+#       number: GPIO05
+#       inverted: true
+#       ignore_strapping_warning: true
+#     internal: true
+#     restore_mode: RESTORE_DEFAULT_ON
 
 binary_sensor:
 
@@ -22,6 +22,6 @@ binary_sensor:
     device_class: 'connectivity'
     lambda: return global_api_server->is_connected();
     on_press:
-      - light.turn_off: led_status
+      - light.turn_off: blue_led #led_status
     on_release:
-      - light.turn_on: led_status
+      - light.turn_on: blue_led #led_status
