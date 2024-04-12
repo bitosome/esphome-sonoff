@@ -6,22 +6,12 @@ output:
     id: pwm_output
     pin: GPIO18
     frequency: 1000 Hz
-  - platform: ledc
-    id: led_status
-    pin: GPIO05
-    frequency: 1000 Hz
 
 light:
   # HA UI connection to the background brightness (PWM) pin
   - platform: monochromatic
     output: pwm_output
     name: "RED LED"
-    restore_mode: RESTORE_DEFAULT_OFF
-    icon: 'mdi:led-outline'
-    entity_category: 'config'
-  - platform: monochromatic
-    output: led_status
-    name: "Blue LED"
     restore_mode: RESTORE_DEFAULT_OFF
     icon: 'mdi:led-outline'
     entity_category: 'config'
