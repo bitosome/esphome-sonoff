@@ -1,15 +1,14 @@
 light:
   # Physical pin to the connection status LED
   # We don't expose this to the HA UI (internal)
-  - platform: ledc #status_led
+  - platform: status_led
     name: "LED"
     id: led_status
     pin:
       number: GPIO05
       inverted: true
       ignore_strapping_warning: true
-    frequency: 1000 Hz #added
-    #internal: true
+    internal: true
     restore_mode: RESTORE_DEFAULT_ON
 
 binary_sensor:
