@@ -11,7 +11,7 @@ light:
   # HA UI connection to the background brightness (PWM) pin
   - platform: monochromatic
     output: pwm_output
-    name: "RED LED"
+    name: "Red LED"
     restore_mode: RESTORE_DEFAULT_OFF
     icon: 'mdi:led-outline'
     entity_category: 'config'
