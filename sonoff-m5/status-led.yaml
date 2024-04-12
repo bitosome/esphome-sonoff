@@ -1,4 +1,4 @@
-# light:
+light:
 #   # Physical pin to the connection status LED
 #   # We don't expose this to the HA UI (internal)
   - platform: status_led
