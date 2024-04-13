@@ -32,11 +32,15 @@ binary_sensor:
           - ${timing_double_click_3}
           - ${timing_double_click_4}
         then:
-          - homeassistant.event:
-              event: esphome.on_gesture
+          # - homeassistant.event:
+          #     event: esphome.on_gesture
+          #     data:
+          #       button: B
+          #       gesture: double_click
+          - homeassistant.service:
+              service: input_button.press
               data:
-                button: B
-                gesture: double_click
+                entity_id: input_button.${device_name}_right_button_double_click
 
       # hold detection
       - timing:
