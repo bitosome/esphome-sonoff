@@ -2,8 +2,8 @@ substitutions:
   device_friendly_name: "Office light switch 2"
   device_name: "office-light-switch-2"
   #device_ip: "0.0.0.0"
-  device_model: "Switchman M5 (1-Gang)"
   device_make: "Sonoff"
+  device_model: "Switchman M5 (1-Gang)"
   package_version: "0.0.1"
 
   button_a_gpio: GPIO00           # Button Configurations
@@ -321,6 +321,7 @@ binary_sensor:
             - lambda: 'return id(mode_a).active_index() == 3;' # Decoupled
           then:
             - switch.toggle: led_indicator
+  
     on_release:
       - if:
           condition:

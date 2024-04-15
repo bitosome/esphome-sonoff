@@ -1,9 +1,9 @@
 substitutions:
-  device_friendly_name: "Office light switch 2"
-  device_name: "office-light-switch-2"
+  device_friendly_name: ""
+  device_name: ""
   #device_ip: "0.0.0.0"
-  device_model: "Switchman M5 (1-Gang)"
   device_make: "Sonoff"
+  device_model: "Switchman M5 (2-Gang)"
   package_version: "0.0.1"
 
   button_a_gpio: GPIO04 # Button Configurations
@@ -255,6 +255,22 @@ select:
     set_action:
       - switch.turn_off: relay_a
 
+  - platform: template
+    name: "Mode - Button B"
+    id: mode_b
+    icon: 'mdi:link-box-outline'
+    entity_category: 'config'
+    options:
+      - "Latching"    # 0
+      - "Momentary"   # 1
+      - "Pulse"       # 2
+      - "Decoupled"   # 3
+    initial_option: "Latching"
+    restore_value: true
+    optimistic: true
+    set_action:
+      - switch.turn_off: relay_b
+
 output:
   # Physical GPIO PWM for off-state background brightness
   # This pin controls the background brightness for all LEDs
@@ -341,6 +357,7 @@ binary_sensor:
             - lambda: 'return id(mode_a).active_index() == 3;' # Decoupled
           then:
             - switch.toggle: led_indicator
+  
     on_release:
       - if:
           condition:
@@ -435,7 +452,7 @@ binary_sensor:
           condition:
             - lambda: 'return id(mode_b).active_index() == 3;'
           then:
-            - switch.turn_on: led_indicator
+            - switch.toggle: led_indicator
 
     on_release:
       # Momentary
@@ -449,7 +466,7 @@ binary_sensor:
           condition:
             - lambda: 'return id(mode_b).active_index() == 3;'
           then:
-            - switch.turn_off: led_indicator
+            # - switch.turn_off: led_indicator
 
     on_multi_click:
       # single click detection
@@ -470,15 +487,11 @@ binary_sensor:
           - ${timing_double_click_3}
           - ${timing_double_click_4}
         then:
-          # - homeassistant.event:
-          #     event: esphome.on_gesture
-          #     data:
-          #       button: B
-          #       gesture: double_click
-          - homeassistant.service:
-              service: input_button.press
+          - homeassistant.event:
+              event: esphome.on_gesture
               data:
-                entity_id: input_button.${device_name}_right_button_double_click
+                button: B
+                gesture: double_click
 
       # hold detection
       - timing:
