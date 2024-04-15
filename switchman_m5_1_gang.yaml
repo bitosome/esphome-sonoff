@@ -258,7 +258,7 @@ light:
     name: "LED"
     id: led_status
     pin:
-      number: GPIO05
+      number: ${led_status_gpio}
       inverted: true
       ignore_strapping_warning: true
     internal: true
@@ -289,7 +289,7 @@ binary_sensor:
     name: "Button A"
     id: button_a
     pin: 
-      number: GPIO00
+      number: ${button_a_gpio}
       mode: INPUT_PULLUP
       inverted: true
       ignore_strapping_warning: true
