@@ -1,15 +1,15 @@
 substitutions:
-  device_friendly_name: ""
-  device_name: ""
+  device_friendly_name: "Outdoor light switch"
+  device_name: "outdoor-light-switch"
   #device_ip: "0.0.0.0"
   device_make: "Sonoff"
   device_model: "Switchman M5 (2-Gang)"
   package_version: "0.0.1"
 
-  button_a_gpio: GPIO04 # Button Configurations
-  button_b_gpio: GPIO15
-  relay_a_gpio: GPIO23             # Relay Configurations
-  relay_b_gpio: GPIO19
+  button_a_gpio: GPIO04           # Button A Configurations
+  button_b_gpio: GPIO15           # Button B Configurations
+  relay_a_gpio: GPIO23            # Relay A Configurations
+  relay_b_gpio: GPIO19            # Relay B Configurations
   led_indicator_gpio: GPIO22      # Indicator LED
   led_status_gpio: GPIO05         # Status LED
   led_pwm_output_gpio: GPIO18     # LED PWM output
@@ -194,11 +194,55 @@ button:
     id: factory_reset_all
     icon: mdi:factory
 
+  - platform: template
+    name: "Button A double click action"
+    id: "button_a_double_click_action"
+    on_press:
+      - homeassistant.event:
+          event: esphome.switchman_m5
+          data:
+            button: A
+            action: double_click
+      - logger.log: "Button A double click action received from Home Assistant"
+
+  - platform: template
+    name: "Button A hold action"
+    id: "button_a_hold_action"
+    on_press:
+      - homeassistant.event:
+          event: esphome.switchman_m5
+          data:
+            button: A
+            action: hold
+      - logger.log: "Button A hold action received from Home Assistant"
+
+  - platform: template
+    name: "Button B double click action"
+    id: "button_b_double_click_action"
+    on_press:
+      - homeassistant.event:
+          event: esphome.switchman_m5
+          data:
+            button: B
+            action: double_click
+      - logger.log: "Button B double click action received from Home Assistant"
+
+  - platform: template
+    name: "Button B hold action"
+    id: "button_b_hold_action"
+    on_press:
+      - homeassistant.event:
+          event: esphome.switchman_m5
+          data:
+            button: B
+            action: hold
+      - logger.log: "Button B hold action received from Home Assistant"
+
 switch:
   # Physical indicator of the relay
   - platform: gpio
+    name: "LED indicator"
     id: led_indicator
-    internal: true
     pin: ${led_indicator_gpio}
 
   # Physical GPIO Relay A
@@ -231,11 +275,35 @@ switch:
     name: "Button A state"
     id: button_a_state
     optimistic: true #?
+    on_turn_on: 
+      - homeassistant.event:
+          event: esphome.switchman_m5
+          data:
+            button: A
+            action: switch_on
+    on_turn_off: 
+      - homeassistant.event:
+          event: esphome.switchman_m5
+          data:
+            button: A
+            action: switch_off
 
   - platform: template
     name: "Button B state"
     id: button_b_state
     optimistic: true #?
+    on_turn_on: 
+      - homeassistant.event:
+          event: esphome.switchman_m5
+          data:
+            button: B
+            action: switch_on
+    on_turn_off: 
+      - homeassistant.event:
+          event: esphome.switchman_m5
+          data:
+            button: B
+            action: switch_off
 
 select:
     # Config-only select for operation mode
@@ -330,9 +398,9 @@ binary_sensor:
       inverted: true
       # ignore_strapping_warning: true
 
-    # filters:
-    #   - delayed_on: ${filter_delay_on}
-    #   - delayed_off: ${filter_delay_off}
+    filters:
+      - delayed_on: ${filter_delay_on}
+      - delayed_off: ${filter_delay_off}
     
     on_press:
       - if:
@@ -352,11 +420,12 @@ binary_sensor:
             - switch.turn_on: relay_a
             - delay: ${timing_pulse}
             - switch.turn_off: relay_a
-      - if:
-          condition:
-            - lambda: 'return id(mode_a).active_index() == 3;' # Decoupled
-          then:
-            - switch.toggle: led_indicator
+      # - if:
+      #     condition:
+      #       - lambda: 'return id(mode_a).active_index() == 3;' # Decoupled
+      #     then:
+      #       - switch.toggle: led_indicator
+      #       - switch.toggle: button_a_state
   
     on_release:
       - if:
@@ -364,23 +433,23 @@ binary_sensor:
             - lambda: 'return id(mode_a).active_index() == 1;' # Momentary
           then:
             - switch.turn_off: relay_a
-      - if:
-          condition:
-            - lambda: 'return id(mode_a).active_index() == 3;' # Decoupled
-          then:
-            # - switch.turn_off: led_indicator
+      # - if:
+      #     condition:
+      #       - lambda: 'return id(mode_a).active_index() == 3;' # Decoupled
+      #     then:
+      #       - switch.turn_off: led_indicator
 
     on_multi_click:
       # single click detection
-      - timing:
-        - ${timing_click_1}
-        - ${timing_click_2}
-        then:
-          - homeassistant.event:
-              event: esphome.on_gesture
-              data:
-                button: A
-                gesture: single_click
+      # - timing:
+      #   - ${timing_click_1}
+      #   - ${timing_click_2}
+      #   then:
+      #     - homeassistant.event:
+      #         event: esphome.switchman_m5
+      #         data:
+      #           button: A
+      #           action: single_click
 
       # double click detection
       - timing:
@@ -390,10 +459,10 @@ binary_sensor:
           - ${timing_double_click_4}
         then:
           - homeassistant.event:
-              event: esphome.on_gesture
+              event: esphome.switchman_m5
               data:
                 button: A
-                gesture: double_click
+                action: double_click
 
       # hold detection
       - timing:
@@ -405,10 +474,10 @@ binary_sensor:
               then:
                 - light.toggle: led_status
                 - homeassistant.event:
-                    event: esphome.on_gesture
+                    event: esphome.switchman_m5
                     data:
                       button: A
-                      gesture: button_hold
+                      action: hold
                 - delay: ${timing_hold_repeat}
           - light.turn_off: led_status
 
@@ -422,37 +491,34 @@ binary_sensor:
       inverted: true
       ignore_strapping_warning: true
 
-    # filters:
-    #   - delayed_on: ${filter_delay_on}
-    #   - delayed_off: ${filter_delay_off}
+    filters:
+      - delayed_on: ${filter_delay_on}
+      - delayed_off: ${filter_delay_off}
 
     on_press:
-      # Latching
       - if:
           condition:
-            - lambda: 'return id(mode_b).active_index() == 0;'
+            - lambda: 'return id(mode_b).active_index() == 0;' # Latching
           then:
             - switch.toggle: relay_b
-      # Momentary
       - if:
           condition:
-            - lambda: 'return id(mode_b).active_index() == 1;'
+            - lambda: 'return id(mode_b).active_index() == 1;' # Momentary
           then:
             - switch.turn_on: relay_b
-      # Pulse
       - if:
           condition:
-            - lambda: 'return id(mode_b).active_index() == 2;'
+            - lambda: 'return id(mode_b).active_index() == 2;' # Pulse
           then:
             - switch.turn_on: relay_b
             - delay: ${timing_pulse}
             - switch.turn_off: relay_b
-      # Decoupled
       - if:
           condition:
-            - lambda: 'return id(mode_b).active_index() == 3;'
+            - lambda: 'return id(mode_b).active_index() == 3;' # Decoupled
           then:
             - switch.toggle: led_indicator
+            - switch.toggle: button_b_state
 
     on_release:
       # Momentary
@@ -462,23 +528,23 @@ binary_sensor:
           then:
             - switch.turn_off: relay_b
       # Decoupled
-      - if:
-          condition:
-            - lambda: 'return id(mode_b).active_index() == 3;'
-          then:
-            # - switch.turn_off: led_indicator
+      # - if:
+      #     condition:
+      #       - lambda: 'return id(mode_b).active_index() == 3;'
+      #     then:
+      #       - switch.turn_off: led_indicator # comment out later
 
     on_multi_click:
       # single click detection
-      - timing:
-        - ${timing_click_1}
-        - ${timing_click_2}
-        then:
-          - homeassistant.event:
-              event: esphome.on_gesture
-              data:
-                button: B
-                gesture: single_click
+      # - timing:
+      #   - ${timing_click_1}
+      #   - ${timing_click_2}
+      #   then:
+      #     - homeassistant.event:
+      #         event: esphome.switchman_m5
+      #         data:
+      #           button: B
+      #           action: single_click
 
       # double click detection
       - timing:
@@ -488,10 +554,10 @@ binary_sensor:
           - ${timing_double_click_4}
         then:
           - homeassistant.event:
-              event: esphome.on_gesture
+              event: esphome.switchman_m5
               data:
                 button: B
-                gesture: double_click
+                action: double_click
 
       # hold detection
       - timing:
@@ -503,9 +569,9 @@ binary_sensor:
               then:
                 - light.toggle: led_status
                 - homeassistant.event:
-                    event: esphome.on_gesture
+                    event: esphome.switchman_m5
                     data:
                       button: B
-                      gesture: button_hold
+                      action: hold
                 - delay: ${timing_hold_repeat}
           - light.turn_off: led_status
