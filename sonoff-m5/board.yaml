@@ -1,6 +1,0 @@
-# Define the board for the compiler
-esp32:
-  board: esp32dev
-  framework:
-    type: arduino
-    version: recommended
