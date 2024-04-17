@@ -1,6 +1,6 @@
 substitutions:
-  device_friendly_name: "Office light switch 2"
-  device_name: "office-light-switch-2"
+  device_friendly_name: "X light switch"
+  device_name: "x-light-switch"
   #device_ip: "0.0.0.0"
   device_make: "Sonoff"
   device_model: "Switchman M5 (1-Gang)"
