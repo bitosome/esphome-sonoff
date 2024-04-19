@@ -6,10 +6,10 @@ substitutions:
   device_model: "Switchman M5 (1-Gang)"
   package_version: "1.0.0"
 
-  button_a_gpio: GPIO00           # Button Configurations
-  relay_a_gpio: GPIO23            # Relay Configurations
-  led_indicator_gpio: GPIO19      # Indicator LED
-  led_status_gpio: GPIO05         # Status LED
+  button_a_gpio: GPIO00           # Button A
+  relay_a_gpio: GPIO23            # Relay A
+  led_indicator_gpio: GPIO19      # Red LED
+  led_status_gpio: GPIO05         # Blue LED
   led_pwm_output_gpio: GPIO18     # LED PWM output
 
   api_key: !secret api_key
@@ -229,10 +229,8 @@ switch:
     restore_mode: RESTORE_DEFAULT_OFF
     on_turn_on:
     - switch.turn_on: led_indicator
-    - switch.turn_on: button_a_state
     on_turn_off:
     - switch.turn_off: led_indicator
-    - switch.turn_off: button_a_state
 
   - platform: template
     name: "Button A state"
@@ -291,13 +289,13 @@ light:
   
   # Physical pin to the connection status LED (internal)
   - platform: status_led
-    name: "LED"
+    name: "Blue LED"
     id: led_status
     pin:
       number: ${led_status_gpio}
       inverted: true
       ignore_strapping_warning: true
-    internal: true
+    # internal: true
     restore_mode: RESTORE_DEFAULT_ON
 
 binary_sensor:
