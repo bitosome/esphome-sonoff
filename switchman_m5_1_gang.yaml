@@ -228,9 +228,9 @@ switch:
     id: relay_a
     restore_mode: RESTORE_DEFAULT_OFF
     on_turn_on:
-    - switch.turn_on: led_indicator
+    - switch.turn_on: button_a_state
     on_turn_off:
-    - switch.turn_off: led_indicator
+    - switch.turn_off: button_a_state
 
   - platform: template
     name: "Button A state"
