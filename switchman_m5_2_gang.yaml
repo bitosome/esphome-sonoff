@@ -96,10 +96,6 @@ api:
   #encryption:
     #key: "${api_key}"
 
-ota:
-  safe_mode: true
-  password: "${ota_password}"
-
 text_sensor:
   - platform: wifi_info
     ip_address:
