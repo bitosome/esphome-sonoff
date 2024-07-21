@@ -4,7 +4,7 @@ substitutions:
   #device_ip: "0.0.0.0"
   device_make: "Sonoff"
   device_model: "Switchman M5 (2-Gang)"
-  package_version: "2.0.0"
+  package_version: "2.0.1"
 
   button_a_gpio: GPIO04           # Button A
   button_b_gpio: GPIO15           # Button B
