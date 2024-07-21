@@ -78,7 +78,7 @@ wifi:
 
   ap:
     ssid: "${device_name}"
-    password: "${wifi_password}"
+    password: "${ap_password}"
 
 time:
   - platform: sntp
