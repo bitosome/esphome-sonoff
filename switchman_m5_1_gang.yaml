@@ -12,10 +12,6 @@ substitutions:
   led_status_gpio: GPIO05         # Blue LED
   led_pwm_output_gpio: GPIO18     # LED PWM output
 
-  api_key: !secret api_key
-  wifi_ssid: !secret wifi_ssid
-  wifi_password: !secret wifi_password
-
   log_level: INFO
   timezone: "Europe/Tallinn"
 
