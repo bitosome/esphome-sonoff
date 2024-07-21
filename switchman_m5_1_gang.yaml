@@ -57,10 +57,6 @@ esphome:
       - lambda: |-
           id(cpu_speed) = ESP.getCpuFreqMHz();
 
-ota:
-  - platform: esphome
-    password: "${ota_password}"
-    
 logger:
   # Enable logging via network and disable serial port
   level: "${log_level}"
