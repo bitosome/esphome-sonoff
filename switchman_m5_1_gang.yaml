@@ -42,10 +42,6 @@ esp32:
     type: arduino
     version: recommended
 
-ota:
-  - platform: esphome
-    password: "test"
-
 esphome:
   name: "${device_name}"
   friendly_name: "${device_friendly_name}"
