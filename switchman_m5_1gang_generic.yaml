@@ -1,10 +1,17 @@
 substitutions:
   device_model: "Switchman M5 (1-Gang)"
   device_make: "Sonoff"
-  package_version: "3.0.0"
+  package_version: "3.1.1"
 
-  indicator_led_default: "Blue"        # Blue | Red | None
-  backlight_brightness_pct: "70"       # 0–100 (for Blue LED when used as indicator)
+  # Use slug (underscores) for HA entity IDs
+  a_follow_entity: "switch.${device_slug}_relay_a"
+
+  # LEDs & backlight behavior
+  indicator_led_default: "Red"        # Blue | Red | None
+  backlight_brightness_pct: "70"      # 0–100 (used only when Blue is the indicator & output is ON)
+
+  # Mode default
+  default_mode_a: "Smart + Relay"     # Relay only | Smart only | Smart + Relay
 
   log_level: INFO
   timezone: "Europe/Tallinn"
@@ -16,6 +23,7 @@ esphome:
   on_boot:
     priority: -100
     then:
+      # Ensure power stays fed in Smart only (decoupled) mode
       - if:
           condition:
             and:
@@ -60,19 +68,22 @@ captive_portal:
 web_server:
   port: 80
 
-# No status_led: we drive LEDs ourselves.
+# We drive LEDs ourselves.
 
 output:
-  # Backlight PWM (Blue LED)
+  # Blue backlight (active-low on M5) → invert PWM so OFF really means dark
   - platform: ledc
     id: panel_pwm
-    pin: GPIO18
+    pin:
+      number: GPIO18
+      inverted: true
     frequency: 1000 Hz
 
-  # Red LED (digital output)
+  # Red LED (digital)
   - platform: gpio
     id: red_led_out
-    pin: GPIO19
+    pin:
+      number: GPIO19
 
 light:
   # Blue LED (panel backlight)
@@ -117,9 +128,8 @@ switch:
     on_turn_off:
       then:
         - script.execute: refresh_output
-        # No auto-turn-on in Smart only → you can turn the relay OFF if you want
 
-  # HA-facing effective output
+  # Effective output exposed to HA
   - platform: template
     id: a_output
     name: "Switch Button A state"
@@ -234,7 +244,7 @@ sensor:
     update_interval: 60s
 
 text_sensor:
-  # Follow HA entity (uses device_slug to avoid hyphens)
+  # Follow HA entity (safe slug)
   - platform: homeassistant
     id: a_state
     internal: true
@@ -268,7 +278,7 @@ globals:
     restore_value: no
     initial_value: 'false'
 
-  # Optimistic state in Smart only mode
+  # Optimistic state used in Smart only (decoupled) mode
   - id: a_output_state
     type: bool
     restore_value: no
@@ -289,7 +299,7 @@ button:
     name: "Restart"
 
 script:
-  # Compute effective output, publish it, and set LEDs according to selection
+  # Publish effective output & drive LEDs
   - id: refresh_output
     then:
       - lambda: |-
@@ -302,6 +312,7 @@ script:
           else eff = (ha_on || rel_on);
           id(a_output).publish_state(eff);
 
+      # Blue is ON only when Indicator=Blue AND effective output is ON
       - if:
           condition:
             lambda: 'return id(indicator_led).state == std::string("Blue");'
@@ -332,11 +343,11 @@ script:
                         - light.turn_off: panel_backlight
                         - light.turn_off: panel_red_led
                 else:
-                  # None selected → no indicator: ensure both OFF
+                  # None selected → both LEDs off
                   - light.turn_off: panel_backlight
                   - light.turn_off: panel_red_led
 
-  # Single press (offline → relay toggle)
+  # Single press
   - id: a_single
     then:
       - if:
@@ -351,7 +362,6 @@ script:
                 if (m == "Relay only") eff = rel_on;
                 else if (m == "Smart only") eff = id(a_output_state);
                 else eff = (ha_on || rel_on);
-                // target state after click
                 id(a_last_known_on) = !eff;
             # OFF path
             - if:
@@ -433,8 +443,18 @@ script:
                         - lambda: 'id(a_output_state) = true;'
             - script.execute: refresh_output
           else:
-            - switch.toggle: relay_a
-            - script.execute: refresh_output
+            # OFFLINE behavior:
+            # - Smart only: toggle virtual state only (never touch relay)
+            # - Others: fall back to local relay control
+            - if:
+                condition:
+                  lambda: 'return id(mode_a).state == "Smart only";'
+                then:
+                  - lambda: 'id(a_output_state) = !id(a_output_state);'
+                  - script.execute: refresh_output
+              else:
+                - switch.toggle: relay_a
+                - script.execute: refresh_output
 
   # Double click
   - id: a_double
@@ -478,10 +498,15 @@ script:
                       data:
                         entity_id: ${a_double_entity3}
           else:
-            - switch.toggle: relay_a
+            # OFFLINE: never touch relay in Smart only
+            - if:
+                condition:
+                  lambda: 'return id(mode_a).state != "Smart only";'
+                then:
+                  - switch.toggle: relay_a
       - script.execute: refresh_output
 
-  # Hold primitives
+  # Hold primitives (no relay touches here)
   - id: a_hold_tick
     then:
       - if:
