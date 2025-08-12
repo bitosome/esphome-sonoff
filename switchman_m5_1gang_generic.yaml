@@ -69,8 +69,9 @@ light:
     restore_mode: RESTORE_DEFAULT_OFF
     default_transition_length: 0s
 
-# --- Relay A with HA-only guard + behavior shaping on ON ---
+# --- Switches ---
 switch:
+  # Physical relay
   - platform: gpio
     id: relay_a
     name: "${device_friendly_name} Relay A"
@@ -121,6 +122,21 @@ switch:
                   then:
                     - delay: !lambda 'return (uint32_t)(id(inching_a_secs).state * 1000);'
                     - switch.turn_off: relay_a
+
+  # Virtual Output (control this from HA; respects Mode A)
+  - platform: template
+    id: a_virtual_output
+    name: "${device_friendly_name} Output"
+    icon: "mdi:light-switch"
+    lambda: |-
+      if (id(a_state).has_state()) {
+        return id(a_state).state == "on";
+      }
+      return id(relay_a).state;
+    turn_on_action:
+      - script.execute: a_do_on
+    turn_off_action:
+      - script.execute: a_do_off
 
 # --- User-configurable selects/numbers visible in HA ---
 select:
@@ -281,7 +297,7 @@ script:
             - lambda: |-
                 bool is_on = id(a_last_known_on);
                 if (!id(a_state).has_state()) { is_on = id(relay_a).state; }
-                id(a_last_known_on) = !is_on;  // target state after this press
+                id(a_last_known_on) = !is_on;  # target state after this press
             # OFF path
             - if:
                 condition:
@@ -443,3 +459,80 @@ script:
                       data:
                         entity_id: ${a_hold_entity3}
             - delay: 150ms
+
+  # --- Explicit actions used by the Virtual Output switch (no HA helpers needed) ---
+  - id: a_do_off
+    then:
+      - if:
+          condition:
+            lambda: 'return id(mode_a).state != "HA only";'
+          then:
+            - switch.turn_off: relay_a
+      - if:
+          condition:
+            lambda: 'return strlen("${a_off_entity}") > 0;'
+          then:
+            - homeassistant.service:
+                service: ${a_off_service}
+                data:
+                  entity_id: ${a_off_entity}
+      - binary_sensor.template.publish:
+          id: a_effective_state
+          state: !lambda |-
+            if (id(a_state).has_state()) return id(a_state).state == "on";
+            return id(relay_a).state;
+      - script.execute: update_indicator
+
+  - id: a_do_on
+    then:
+      - if:
+          condition:
+            lambda: 'return id(mode_a).state != "HA only";'
+          then:
+            - switch.turn_on: relay_a
+      - if:
+          condition:
+            lambda: 'return strlen("${a_on_entity}") > 0;'
+          then:
+            - if:
+                condition:
+                  lambda: 'return ${a_on_kelvin} != 0 && ${a_on_brightness_pct} != 0;'
+                then:
+                  - homeassistant.service:
+                      service: ${a_on_service}
+                      data:
+                        entity_id: ${a_on_entity}
+                        kelvin: !lambda 'return ${a_on_kelvin};'
+                        brightness_pct: !lambda 'return ${a_on_brightness_pct};'
+            - if:
+                condition:
+                  lambda: 'return ${a_on_kelvin} != 0 && ${a_on_brightness_pct} == 0;'
+                then:
+                  - homeassistant.service:
+                      service: ${a_on_service}
+                      data:
+                        entity_id: ${a_on_entity}
+                        kelvin: !lambda 'return ${a_on_kelvin};'
+            - if:
+                condition:
+                  lambda: 'return ${a_on_kelvin} == 0 && ${a_on_brightness_pct} != 0;'
+                then:
+                  - homeassistant.service:
+                      service: ${a_on_service}
+                      data:
+                        entity_id: ${a_on_entity}
+                        brightness_pct: !lambda 'return ${a_on_brightness_pct};'
+            - if:
+                condition:
+                  lambda: 'return ${a_on_kelvin} == 0 && ${a_on_brightness_pct} == 0;'
+                then:
+                  - homeassistant.service:
+                      service: ${a_on_service}
+                      data:
+                        entity_id: ${a_on_entity}
+      - binary_sensor.template.publish:
+          id: a_effective_state
+          state: !lambda |-
+            if (id(a_state).has_state()) return id(a_state).state == "on";
+            return id(relay_a).state;
+      - script.execute: update_indicator
