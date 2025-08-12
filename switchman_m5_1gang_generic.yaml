@@ -4,8 +4,8 @@
 # - Smart only      → HA services only (keep relay powered when online)
 # - Smart + Relay   → both; output = OR(HA, relay)
 #
-# Output entity: "${device_friendly_name} Switch Button A state"
-# Backlight follows output. Blue indicator LED follows output as well.
+# Output entity: "Switch Button A state"
+# Backlight + Blue indicator follow the effective output state.
 #
 # NOTE: Set `device_slug` in your mini to the underscore form of device_name (no hyphens),
 # e.g. device_name: office-light-switch-1  →  device_slug: office_light_switch_1
@@ -83,10 +83,10 @@ output:
       inverted: ${blue_led_inverted}
 
 light:
-  # Panel backlight (“Blue LED” in UI to preserve existing naming)
+  # Panel backlight (“Blue LED” in UI → HA will prefix device name automatically)
   - platform: monochromatic
     id: panel_backlight
-    name: "${device_friendly_name} Blue LED"
+    name: "Blue LED"
     output: panel_pwm
     restore_mode: RESTORE_DEFAULT_OFF
     default_transition_length: 0s
@@ -94,20 +94,20 @@ light:
   # Red LED
   - platform: binary
     id: panel_red_led
-    name: "${device_friendly_name} Red LED"
+    name: "Red LED"
     output: red_led_out
 
   # Blue indicator LED (follows the button/output state)
   - platform: binary
     id: panel_blue_indicator
-    name: "${device_friendly_name} Blue Indicator LED"
+    name: "Blue Indicator LED"
     output: blue_led_out
 
 switch:
   # Physical relay
   - platform: gpio
     id: relay_a
-    name: "${device_friendly_name} Relay A"
+    name: "Relay A"
     pin: GPIO23
     on_turn_on:
       then:
@@ -142,7 +142,7 @@ switch:
   # HA-facing output (the one you control in HA)
   - platform: template
     id: a_output
-    name: "${device_friendly_name} Switch Button A state"
+    name: "Switch Button A state"
     icon: mdi:light-switch
     lambda: |-
       bool ha_on = (id(a_state).has_state() && id(a_state).state == "on");
@@ -151,15 +151,24 @@ switch:
       if (m == "Relay only") return rel_on;
       if (m == "Smart only") return id(a_output_state);
       return (ha_on || rel_on);
+    # Ensure LEDs follow immediately on user actions
     turn_on_action:
       - script.execute: a_do_on
+      - light.turn_on: panel_blue_indicator
+      - light.turn_on:
+          id: panel_backlight
+          brightness: 70%
+      - script.execute: refresh_output
     turn_off_action:
       - script.execute: a_do_off
+      - light.turn_off: panel_blue_indicator
+      - light.turn_off: panel_backlight
+      - script.execute: refresh_output
 
 select:
   - platform: template
     id: mode_a
-    name: "${device_friendly_name} – Mode A"
+    name: "Mode A"
     options:
       - Relay only
       - Smart only
@@ -171,7 +180,7 @@ select:
 
   - platform: template
     id: behavior_a
-    name: "${device_friendly_name} – Relay A behavior"
+    name: "Relay A behavior"
     options:
       - Latching
       - Momentary 200ms
@@ -184,7 +193,7 @@ select:
 number:
   - platform: template
     id: inching_a_secs
-    name: "${device_friendly_name} – Inching A (s)"
+    name: "Inching A (s)"
     min_value: 1
     max_value: 600
     step: 1
@@ -227,15 +236,15 @@ binary_sensor:
         - script.stop: a_hold_loop
 
   - platform: status
-    name: "${device_friendly_name} Status"
+    name: "Status"
 
 sensor:
   - platform: wifi_signal
-    name: "${device_friendly_name} WiFi RSSI"
+    name: "WiFi RSSI"
     update_interval: 60s
 
   - platform: uptime
-    name: "${device_friendly_name} Uptime"
+    name: "Uptime"
     update_interval: 60s
 
 text_sensor:
@@ -255,17 +264,17 @@ text_sensor:
         - script.execute: refresh_output
 
   - platform: version
-    name: "${device_friendly_name} ESPHome Version"
+    name: "ESPHome Version"
 
   - platform: wifi_info
     ip_address:
-      name: "${device_friendly_name} IP"
+      name: "IP"
     ssid:
-      name: "${device_friendly_name} SSID"
+      name: "SSID"
     bssid:
-      name: "${device_friendly_name} BSSID"
+      name: "BSSID"
     mac_address:
-      name: "${device_friendly_name} MAC"
+      name: "MAC"
 
 globals:
   - id: a_last_known_on
@@ -281,17 +290,17 @@ globals:
 
 button:
   - platform: template
-    name: "${device_friendly_name} Simulate Double Click"
+    name: "Simulate Double Click"
     on_press:
       - script.execute: a_double
 
   - platform: template
-    name: "${device_friendly_name} Simulate Hold (1.5s)"
+    name: "Simulate Hold (1.5s)"
     on_press:
       - script.execute: a_hold_burst
 
   - platform: restart
-    name: "${device_friendly_name} Restart"
+    name: "Restart"
 
 script:
   # Compute effective output, publish it, and set LEDs to match
