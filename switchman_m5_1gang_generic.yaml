@@ -331,7 +331,8 @@ script:
                 if (m == "Relay only") eff = rel_on;
                 else if (m == "Smart only") eff = id(a_output_state);
                 else eff = (ha_on || rel_on);
-                id(a_last_known_on) = !eff;  # target state after click
+                // target state after click
+                id(a_last_known_on) = !eff;
             # OFF path
             - if:
                 condition:
