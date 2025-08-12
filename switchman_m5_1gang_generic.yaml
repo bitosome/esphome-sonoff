@@ -5,9 +5,9 @@
 # - Smart + Relay   → both; output = OR(HA, relay)
 #
 # Output entity: "Switch Button A state"
-# Backlight (Blue LED) and the blue indicator (GPIO5) follow the effective output.
+# Indicator: choose which LED follows the effective output (Blue or Red).
 #
-# NOTE: In your mini, set:
+# In your mini, set:
 #   device_name: office-light-switch-1
 #   device_friendly_name: Office light switch 1
 #   device_slug: office_light_switch_1   # underscore version for HA entity IDs
@@ -43,8 +43,9 @@ substitutions:
   a_hold_entity3: ""
   a_hold_step_pct: "0"
 
-  default_mode_a: "Relay only"      # Relay only | Smart only | Smart + Relay
-  blue_led_inverted: "false"         # flip true if your blue indicator looks inverted
+  default_mode_a: "Relay only"        # Relay only | Smart only | Smart + Relay
+  indicator_led_default: "Blue"        # Blue | Red
+  backlight_brightness_pct: "70"       # Blue LED brightness when ON (0-100)
 
 esphome:
   name: ${device_name}
@@ -63,10 +64,10 @@ esphome:
 
 logger:
 
-# We do NOT use status_led: we control the blue indicator ourselves.
+# No status_led: we drive LEDs ourselves.
 
 output:
-  # Backlight PWM (panel LED driver)
+  # Backlight PWM (panel LED driver → Blue LED)
   - platform: ledc
     id: panel_pwm
     pin: GPIO18
@@ -77,15 +78,8 @@ output:
     id: red_led_out
     pin: GPIO19
 
-  # Blue indicator LED (binary pin). Invert if your hardware requires it.
-  - platform: gpio
-    id: blue_led_out
-    pin:
-      number: GPIO5
-      inverted: ${blue_led_inverted}
-
 light:
-  # Panel backlight (HA will prefix device name automatically)
+  # Panel backlight (Blue)
   - platform: monochromatic
     id: panel_backlight
     name: "Blue LED"
@@ -127,7 +121,7 @@ switch:
     on_turn_off:
       then:
         - script.execute: refresh_output
-        # REMOVED: auto-turn-on in Smart only (so you can turn relay OFF in Smart mode)
+        # No auto-turn-on in Smart only → you can turn the relay OFF if you want
 
   # HA-facing effective output
   - platform: template
@@ -141,18 +135,11 @@ switch:
       if (m == "Relay only") return rel_on;
       if (m == "Smart only") return id(a_output_state);
       return (ha_on || rel_on);
-    # Keep LEDs perfectly in sync with user actions
     turn_on_action:
       - script.execute: a_do_on
-      - output.turn_on: blue_led_out
-      - light.turn_on:
-          id: panel_backlight
-          brightness: 70%
       - script.execute: refresh_output
     turn_off_action:
       - script.execute: a_do_off
-      - output.turn_off: blue_led_out
-      - light.turn_off: panel_backlight
       - script.execute: refresh_output
 
 select:
@@ -178,6 +165,18 @@ select:
     optimistic: true
     restore_value: true
     initial_option: "Latching"
+    entity_category: config
+
+  # NEW: which LED reflects the effective output
+  - platform: template
+    id: indicator_led
+    name: "Indicator LED"
+    options:
+      - Blue
+      - Red
+    optimistic: true
+    restore_value: true
+    initial_option: ${indicator_led_default}
     entity_category: config
 
 number:
@@ -293,7 +292,7 @@ button:
     name: "Restart"
 
 script:
-  # Compute effective output, publish it, and set LEDs to match
+  # Compute effective output, publish it, and set LEDs to match selection
   - id: refresh_output
     then:
       - lambda: |-
@@ -305,15 +304,34 @@ script:
           else if (m == "Smart only") eff = id(a_output_state);
           else eff = (ha_on || rel_on);
           id(a_output).publish_state(eff);
-          if (eff) {
-            auto c = id(panel_backlight).turn_on();
-            c.set_brightness(0.70f);
-            c.perform();
-            id(blue_led_out).turn_on();
-          } else {
-            id(panel_backlight).turn_off();
-            id(blue_led_out).turn_off();
-          }
+
+      # Apply LED policy based on selection
+      - if:
+          condition:
+            lambda: 'return id(indicator_led).state == std::string("Blue");'
+          then:
+            - if:
+                condition:
+                  lambda: 'return id(a_output).state;'
+                then:
+                  - light.turn_on:
+                      id: panel_backlight
+                      brightness: !lambda 'return ${backlight_brightness_pct} / 100.0f;'
+                  - light.turn_off: panel_red_led
+                else:
+                  - light.turn_off: panel_backlight
+                  - light.turn_off: panel_red_led
+          else:
+            # Red selected
+            - if:
+                condition:
+                  lambda: 'return id(a_output).state;'
+                then:
+                  - light.turn_off: panel_backlight
+                  - light.turn_on: panel_red_led
+                else:
+                  - light.turn_off: panel_backlight
+                  - light.turn_off: panel_red_led
 
   # Single press (offline → relay toggle)
   - id: a_single
