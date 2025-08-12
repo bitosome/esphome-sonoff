@@ -77,8 +77,16 @@ switch:
     pin: GPIO23
     on_turn_off:
       then:
-        - component.update: a_effective_state
+        # update dashboard-friendly state + indicator
+        - binary_sensor.template.publish:
+            id: a_effective_state
+            state: !lambda |-
+              bool on = false;
+              if (id(a_state).has_state()) on = (id(a_state).state == "on");
+              else on = id(relay_a).state;
+              return on;
         - script.execute: update_indicator
+        # keep bulbs powered in HA-only only when HA/API is connected
         - if:
             condition:
               and:
@@ -88,7 +96,13 @@ switch:
               - switch.turn_on: relay_a
     on_turn_on:
       then:
-        - component.update: a_effective_state
+        - binary_sensor.template.publish:
+            id: a_effective_state
+            state: !lambda |-
+              bool on = false;
+              if (id(a_state).has_state()) on = (id(a_state).state == "on");
+              else on = id(relay_a).state;
+              return on;
         - script.execute: update_indicator
         # Apply behavior shaping only when not HA-only (we're allowed to touch the relay)
         - if:
@@ -211,6 +225,7 @@ binary_sensor:
 text_sensor:
   - platform: homeassistant
     id: a_state
+    internal: true
     entity_id: ${a_follow_entity}
     on_value:
       then:
@@ -220,7 +235,13 @@ text_sensor:
             } else if (id(a_state).state == "off") {
               id(a_last_known_on) = false;
             }
-        - component.update: a_effective_state
+        - binary_sensor.template.publish:
+            id: a_effective_state
+            state: !lambda |-
+              bool on = false;
+              if (id(a_state).has_state()) on = (id(a_state).state == "on");
+              else on = id(relay_a).state;
+              return on;
         - script.execute: update_indicator
 
 globals:
