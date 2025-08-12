@@ -1,8 +1,11 @@
-# Sonoff SwitchMan M5 — 1-gang generic (ESPHome)
+# Sonoff SwitchMan M5 — 1-gang generic
 # Modes:
 #  - Relay only      → relay only
 #  - Smart only      → HA services only (keep relay powered when online)
-#  - Smart + Relay   → both; indicators reflect OR(HA, relay)
+#  - Smart + Relay   → both; output = OR(HA, relay)
+#
+# Output entity: "${device_friendly_name} Switch Button A state"
+# Backlight follows output. Red/Blue LEDs exposed as lights.
 
 substitutions:
   device_name: ""
@@ -49,63 +52,49 @@ esphome:
               - lambda: 'return id(mode_a).state == "Smart only";'
           then:
             - switch.turn_on: relay_a
-      - script.execute: update_indicator
+      - script.execute: refresh_output
 
 logger:
 
+# LEDs / outputs
 status_led:
   pin: GPIO5
 
 output:
+  # Blue backlight PWM
   - platform: ledc
     id: panel_pwm
     pin: GPIO18
     frequency: 1000 Hz
+  # Red LED (digital)
+  - platform: gpio
+    id: red_led_out
+    pin: GPIO19
 
 light:
+  # Blue LED/backlight (brightness)
   - platform: monochromatic
     id: panel_backlight
-    name: "${device_friendly_name} Panel Backlight"
+    name: "${device_friendly_name} Blue LED"
     output: panel_pwm
     restore_mode: RESTORE_DEFAULT_OFF
     default_transition_length: 0s
 
+  # Red LED (on/off)
+  - platform: binary
+    id: panel_red_led
+    name: "${device_friendly_name} Red LED"
+    output: red_led_out
+
+# Relay + Output
 switch:
   - platform: gpio
     id: relay_a
     name: "${device_friendly_name} Relay A"
     pin: GPIO23
-    on_turn_off:
-      then:
-        - binary_sensor.template.publish:
-            id: a_effective_state
-            state: !lambda |-
-              bool ha_on = (id(a_state).has_state() && id(a_state).state == "on");
-              bool rel_on = id(relay_a).state;
-              std::string m = id(mode_a).state;
-              if (m == "Relay only") return rel_on;
-              if (m == "Smart only") return ha_on;
-              return (ha_on || rel_on);
-        - script.execute: update_indicator
-        - if:
-            condition:
-              and:
-                - lambda: 'return id(mode_a).state == "Smart only";'
-                - api.connected
-            then:
-              - switch.turn_on: relay_a
     on_turn_on:
       then:
-        - binary_sensor.template.publish:
-            id: a_effective_state
-            state: !lambda |-
-              bool ha_on = (id(a_state).has_state() && id(a_state).state == "on");
-              bool rel_on = id(relay_a).state;
-              std::string m = id(mode_a).state;
-              if (m == "Relay only") return rel_on;
-              if (m == "Smart only") return ha_on;
-              return (ha_on || rel_on);
-        - script.execute: update_indicator
+        - script.execute: refresh_output
         - if:
             condition:
               lambda: 'return id(mode_a).state != "Smart only";'
@@ -122,31 +111,41 @@ switch:
                   then:
                     - delay: !lambda 'return (uint32_t)(id(inching_a_secs).state * 1000);'
                     - switch.turn_off: relay_a
+    on_turn_off:
+      then:
+        - script.execute: refresh_output
+        - if:
+            condition:
+              and:
+                - lambda: 'return id(mode_a).state == "Smart only";'
+                - api.connected
+            then:
+              - switch.turn_on: relay_a
 
+  # The single HA-facing control/state
   - platform: template
-    id: a_virtual_output
-    name: "${device_friendly_name} Output"
+    id: a_output
+    name: "${device_friendly_name} Switch Button A state"
     icon: "mdi:light-switch"
     lambda: |-
+      // Effective output per mode (Smart only uses optimistic global)
       bool ha_on = (id(a_state).has_state() && id(a_state).state == "on");
       bool rel_on = id(relay_a).state;
       std::string m = id(mode_a).state;
       if (m == "Relay only") return rel_on;
-      if (m == "Smart only") return ha_on;
-      return (ha_on || rel_on);
+      if (m == "Smart only") return id(a_output_state);
+      return (ha_on || rel_on);  // Smart + Relay
     turn_on_action:
       - script.execute: a_do_on
     turn_off_action:
       - script.execute: a_do_off
 
+# Config selects/numbers
 select:
   - platform: template
     id: mode_a
     name: "${device_friendly_name} – Mode A"
-    options:
-      - Relay only
-      - Smart only
-      - Smart + Relay
+    options: [Relay only, Smart only, Smart + Relay]
     optimistic: true
     restore_value: true
     initial_option: ${default_mode_a}
@@ -155,10 +154,7 @@ select:
   - platform: template
     id: behavior_a
     name: "${device_friendly_name} – Relay A behavior"
-    options:
-      - Latching
-      - Momentary 200ms
-      - Inching
+    options: [Latching, Momentary 200ms, Inching]
     optimistic: true
     restore_value: true
     initial_option: "Latching"
@@ -176,6 +172,7 @@ number:
     restore_value: true
     entity_category: config
 
+# Button input
 binary_sensor:
   - platform: gpio
     id: btn_a
@@ -184,45 +181,28 @@ binary_sensor:
       mode: INPUT_PULLUP
       inverted: true
     internal: true
-    filters:
-      - delayed_on_off: 30ms
+    filters: [delayed_on_off: 30ms]
     on_click:
       - min_length: 50ms
         max_length: 400ms
-        then:
-          - script.execute: a_single
+        then: { script.execute: a_single }
     on_double_click:
       - min_length: 50ms
         max_length: 350ms
-        then:
-          - script.execute: a_double
+        then: { script.execute: a_double }
     on_press:
       then:
         - delay: 500ms
         - if:
-            condition:
-              binary_sensor.is_on: btn_a
-            then:
-              - script.execute: a_hold_loop
+            condition: { binary_sensor.is_on: btn_a }
+            then: { script.execute: a_hold_loop }
     on_release:
-      then:
-        - script.stop: a_hold_loop
-
-  - platform: template
-    id: a_effective_state
-    name: "${device_friendly_name} Button A state"
-    device_class: power
-    lambda: |-
-      bool ha_on = (id(a_state).has_state() && id(a_state).state == "on");
-      bool rel_on = id(relay_a).state;
-      std::string m = id(mode_a).state;
-      if (m == "Relay only") return rel_on;
-      if (m == "Smart only") return ha_on;
-      return (ha_on || rel_on);
+      then: { script.stop: a_hold_loop }
 
   - platform: status
     name: "${device_friendly_name} Status"
 
+# Diagnostics
 sensor:
   - platform: wifi_signal
     name: "${device_friendly_name} WiFi RSSI"
@@ -238,35 +218,30 @@ text_sensor:
     entity_id: ${a_follow_entity}
     on_value:
       then:
-        - lambda: |-
-            if (id(a_state).state == "on") id(a_last_known_on) = true;
-            else if (id(a_state).state == "off") id(a_last_known_on) = false;
-        - binary_sensor.template.publish:
-            id: a_effective_state
-            state: !lambda |-
-              bool ha_on = (id(a_state).has_state() && id(a_state).state == "on");
-              bool rel_on = id(relay_a).state;
-              std::string m = id(mode_a).state;
-              if (m == "Relay only") return rel_on;
-              if (m == "Smart only") return ha_on;
-              return (ha_on || rel_on);
-        - script.execute: update_indicator
+        # In Smart only, sync optimistic state to HA-reported value when it arrives
+        - if:
+            condition:
+              lambda: 'return id(mode_a).state == "Smart only";'
+            then:
+              - lambda: |-
+                  id(a_output_state) = (id(a_state).state == "on");
+        - script.execute: refresh_output
 
   - platform: version
     name: "${device_friendly_name} ESPHome Version"
 
   - platform: wifi_info
-    ip_address:
-      name: "${device_friendly_name} IP"
-    ssid:
-      name: "${device_friendly_name} SSID"
-    bssid:
-      name: "${device_friendly_name} BSSID"
-    mac_address:
-      name: "${device_friendly_name} MAC"
+    ip_address:  { name: "${device_friendly_name} IP" }
+    ssid:        { name: "${device_friendly_name} SSID" }
+    bssid:       { name: "${device_friendly_name} BSSID" }
+    mac_address: { name: "${device_friendly_name} MAC" }
 
 globals:
   - id: a_last_known_on
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  - id: a_output_state         # optimistic state used only in Smart only mode
     type: bool
     restore_value: no
     initial_value: 'false'
@@ -274,24 +249,27 @@ globals:
 button:
   - platform: template
     name: "${device_friendly_name} Simulate Double Click"
-    on_press:
-      - script.execute: a_double
+    on_press: { script.execute: a_double }
   - platform: template
     name: "${device_friendly_name} Simulate Hold (1.5s)"
-    on_press:
-      - script.execute: a_hold_burst
+    on_press: { script.execute: a_hold_burst }
   - platform: restart
     name: "${device_friendly_name} Restart"
 
 script:
-  - id: update_indicator
+  # Compute effective output, publish it, and set backlight to match.
+  - id: refresh_output
     then:
       - lambda: |-
           bool ha_on = (id(a_state).has_state() && id(a_state).state == "on");
           bool rel_on = id(relay_a).state;
           std::string m = id(mode_a).state;
-          bool on = (m == "Relay only") ? rel_on : (m == "Smart only") ? ha_on : (ha_on || rel_on);
-          if (on) {
+          bool eff = false;
+          if (m == "Relay only") eff = rel_on;
+          else if (m == "Smart only") eff = id(a_output_state);
+          else eff = (ha_on || rel_on);
+          id(a_output).publish_state(eff);
+          if (eff) {
             auto c = id(panel_backlight).turn_on();
             c.set_brightness(0.70f);
             c.perform();
@@ -299,6 +277,7 @@ script:
             id(panel_backlight).turn_off();
           }
 
+  # Single press toggles effective state (offline → relay toggle)
   - id: a_single
     then:
       - if:
@@ -308,41 +287,39 @@ script:
                 bool ha_on = (id(a_state).has_state() && id(a_state).state == "on");
                 bool rel_on = id(relay_a).state;
                 std::string m = id(mode_a).state;
-                bool eff = (m == "Relay only") ? rel_on : (m == "Smart only") ? ha_on : (ha_on || rel_on);
-                id(a_last_known_on) = !eff;
+                bool eff = (m == "Relay only") ? rel_on
+                          : (m == "Smart only") ? id(a_output_state)
+                          : (ha_on || rel_on);
+                id(a_last_known_on) = !eff;  // target
+            # OFF
             - if:
-                condition:
-                  lambda: 'return !id(a_last_known_on);'
+                condition: { lambda: 'return !id(a_last_known_on);' }
                 then:
                   - if:
-                      condition:
-                        lambda: 'return id(mode_a).state != "Smart only";'
-                      then:
-                        - switch.turn_off: relay_a
+                      condition: { lambda: 'return id(mode_a).state != "Smart only";' }
+                      then: { switch.turn_off: relay_a }
                   - if:
-                      condition:
-                        lambda: 'return strlen("${a_off_entity}") > 0;'
+                      condition: { lambda: 'return strlen("${a_off_entity}") > 0;' }
                       then:
                         - homeassistant.service:
                             service: ${a_off_service}
-                            data:
-                              entity_id: ${a_off_entity}
+                            data: { entity_id: ${a_off_entity} }
+                  - if:
+                      condition: { lambda: 'return id(mode_a).state == "Smart only";' }
+                      then:
+                        - lambda: 'id(a_output_state) = false;'
+            # ON
             - if:
-                condition:
-                  lambda: 'return id(a_last_known_on);'
+                condition: { lambda: 'return id(a_last_known_on);' }
                 then:
                   - if:
-                      condition:
-                        lambda: 'return id(mode_a).state != "Smart only";'
-                      then:
-                        - switch.turn_on: relay_a
+                      condition: { lambda: 'return id(mode_a).state != "Smart only";' }
+                      then: { switch.turn_on: relay_a }
                   - if:
-                      condition:
-                        lambda: 'return strlen("${a_on_entity}") > 0;'
+                      condition: { lambda: 'return strlen("${a_on_entity}") > 0;' }
                       then:
                         - if:
-                            condition:
-                              lambda: 'return ${a_on_kelvin} != 0 && ${a_on_brightness_pct} != 0;'
+                            condition: { lambda: 'return ${a_on_kelvin} != 0 && ${a_on_brightness_pct} != 0;' }
                             then:
                               - homeassistant.service:
                                   service: ${a_on_service}
@@ -351,8 +328,7 @@ script:
                                     kelvin: !lambda 'return ${a_on_kelvin};'
                                     brightness_pct: !lambda 'return ${a_on_brightness_pct};'
                         - if:
-                            condition:
-                              lambda: 'return ${a_on_kelvin} != 0 && ${a_on_brightness_pct} == 0;'
+                            condition: { lambda: 'return ${a_on_kelvin} != 0 && ${a_on_brightness_pct} == 0;' }
                             then:
                               - homeassistant.service:
                                   service: ${a_on_service}
@@ -360,8 +336,7 @@ script:
                                     entity_id: ${a_on_entity}
                                     kelvin: !lambda 'return ${a_on_kelvin};'
                         - if:
-                            condition:
-                              lambda: 'return ${a_on_kelvin} == 0 && ${a_on_brightness_pct} != 0;'
+                            condition: { lambda: 'return ${a_on_kelvin} == 0 && ${a_on_brightness_pct} != 0;' }
                             then:
                               - homeassistant.service:
                                   service: ${a_on_service}
@@ -369,42 +344,32 @@ script:
                                     entity_id: ${a_on_entity}
                                     brightness_pct: !lambda 'return ${a_on_brightness_pct};'
                         - if:
-                            condition:
-                              lambda: 'return ${a_on_kelvin} == 0 && ${a_on_brightness_pct} == 0;'
+                            condition: { lambda: 'return ${a_on_kelvin} == 0 && ${a_on_brightness_pct} == 0;' }
                             then:
                               - homeassistant.service:
                                   service: ${a_on_service}
                                   data:
                                     entity_id: ${a_on_entity}
-            - binary_sensor.template.publish:
-                id: a_effective_state
-                state: !lambda |-
-                  bool ha_on = (id(a_state).has_state() && id(a_state).state == "on");
-                  bool rel_on = id(relay_a).state;
-                  std::string m = id(mode_a).state;
-                  if (m == "Relay only") return rel_on;
-                  if (m == "Smart only") return ha_on;
-                  return (ha_on || rel_on);
-            - script.execute: update_indicator
+                  - if:
+                      condition: { lambda: 'return id(mode_a).state == "Smart only";' }
+                      then:
+                        - lambda: 'id(a_output_state) = true;'
+            - script.execute: refresh_output
           else:
             - switch.toggle: relay_a
-            - binary_sensor.template.publish:
-                id: a_effective_state
-                state: !lambda 'return id(relay_a).state;'
-            - script.execute: update_indicator
+            - script.execute: refresh_output
 
+  # Double click: HA fan-out; then refresh output (for UI)
   - id: a_double
     then:
       - if:
           condition: api.connected
           then:
             - if:
-                condition:
-                  lambda: 'return strlen("${a_double_entity}") > 0;'
+                condition: { lambda: 'return strlen("${a_double_entity}") > 0;' }
                 then:
                   - if:
-                      condition:
-                        lambda: 'return ${a_double_step_pct} != 0;'
+                      condition: { lambda: 'return ${a_double_step_pct} != 0;' }
                       then:
                         - homeassistant.service:
                             service: ${a_double_service}
@@ -414,53 +379,34 @@ script:
                       else:
                         - homeassistant.service:
                             service: ${a_double_service}
-                            data:
-                              entity_id: ${a_double_entity}
+                            data: { entity_id: ${a_double_entity} }
             - if:
-                condition:
-                  lambda: 'return strlen("${a_double_entity2}") > 0;'
+                condition: { lambda: 'return strlen("${a_double_entity2}") > 0;' }
                 then:
                   - homeassistant.service:
                       service: ${a_double_service2}
-                      data:
-                        entity_id: ${a_double_entity2}
+                      data: { entity_id: ${a_double_entity2} }
             - if:
-                condition:
-                  lambda: 'return strlen("${a_double_entity3}") > 0;'
+                condition: { lambda: 'return strlen("${a_double_entity3}") > 0;' }
                 then:
                   - homeassistant.service:
                       service: ${a_double_service3}
-                      data:
-                        entity_id: ${a_double_entity3}
-            - binary_sensor.template.publish:
-                id: a_effective_state
-                state: !lambda |-
-                  bool ha_on = (id(a_state).has_state() && id(a_state).state == "on");
-                  bool rel_on = id(relay_a).state;
-                  std::string m = id(mode_a).state;
-                  if (m == "Relay only") return rel_on;
-                  if (m == "Smart only") return ha_on;
-                  return (ha_on || rel_on);
-            - script.execute: update_indicator
+                      data: { entity_id: ${a_double_entity3} }
           else:
             - switch.toggle: relay_a
-            - binary_sensor.template.publish:
-                id: a_effective_state
-                state: !lambda 'return id(relay_a).state;'
-            - script.execute: update_indicator
+      - script.execute: refresh_output
 
+  # Hold primitives
   - id: a_hold_tick
     then:
       - if:
           condition: api.connected
           then:
             - if:
-                condition:
-                  lambda: 'return strlen("${a_hold_entity}") > 0;'
+                condition: { lambda: 'return strlen("${a_hold_entity}") > 0;' }
                 then:
                   - if:
-                      condition:
-                        lambda: 'return ${a_hold_step_pct} != 0;'
+                      condition: { lambda: 'return ${a_hold_step_pct} != 0;' }
                       then:
                         - homeassistant.service:
                             service: ${a_hold_service}
@@ -470,42 +416,26 @@ script:
                       else:
                         - homeassistant.service:
                             service: ${a_hold_service}
-                            data:
-                              entity_id: ${a_hold_entity}
+                            data: { entity_id: ${a_hold_entity} }
             - if:
-                condition:
-                  lambda: 'return strlen("${a_hold_entity2}") > 0;'
+                condition: { lambda: 'return strlen("${a_hold_entity2}") > 0;' }
                 then:
                   - homeassistant.service:
                       service: ${a_hold_service2}
-                      data:
-                        entity_id: ${a_hold_entity2}
+                      data: { entity_id: ${a_hold_entity2} }
             - if:
-                condition:
-                  lambda: 'return strlen("${a_hold_entity3}") > 0;'
+                condition: { lambda: 'return strlen("${a_hold_entity3}") > 0;' }
                 then:
                   - homeassistant.service:
                       service: ${a_hold_service3}
-                      data:
-                        entity_id: ${a_hold_entity3}
-            - binary_sensor.template.publish:
-                id: a_effective_state
-                state: !lambda |-
-                  bool ha_on = (id(a_state).has_state() && id(a_state).state == "on");
-                  bool rel_on = id(relay_a).state;
-                  std::string m = id(mode_a).state;
-                  if (m == "Relay only") return rel_on;
-                  if (m == "Smart only") return ha_on;
-                  return (ha_on || rel_on);
-            - script.execute: update_indicator
+                      data: { entity_id: ${a_hold_entity3} }
+      - script.execute: refresh_output
 
   - id: a_hold_loop
     then:
       - while:
           condition:
-            and:
-              - binary_sensor.is_on: btn_a
-              - api.connected
+            and: [ { binary_sensor.is_on: btn_a }, api.connected ]
           then:
             - script.execute: a_hold_tick
             - delay: 150ms
@@ -518,46 +448,34 @@ script:
             - script.execute: a_hold_tick
             - delay: 150ms
 
+  # Direct actions used by the Output switch
   - id: a_do_off
     then:
       - if:
-          condition:
-            lambda: 'return id(mode_a).state != "Smart only";'
-          then:
-            - switch.turn_off: relay_a
+          condition: { lambda: 'return id(mode_a).state != "Smart only";' }
+          then: { switch.turn_off: relay_a }
       - if:
-          condition:
-            lambda: 'return strlen("${a_off_entity}") > 0;'
+          condition: { lambda: 'return strlen("${a_off_entity}") > 0;' }
           then:
             - homeassistant.service:
                 service: ${a_off_service}
-                data:
-                  entity_id: ${a_off_entity}
-      - binary_sensor.template.publish:
-          id: a_effective_state
-          state: !lambda |-
-            bool ha_on = (id(a_state).has_state() && id(a_state).state == "on");
-            bool rel_on = id(relay_a).state;
-            std::string m = id(mode_a).state;
-            if (m == "Relay only") return rel_on;
-            if (m == "Smart only") return ha_on;
-            return (ha_on || rel_on);
-      - script.execute: update_indicator
+                data: { entity_id: ${a_off_entity} }
+      - if:
+          condition: { lambda: 'return id(mode_a).state == "Smart only";' }
+          then:
+            - lambda: 'id(a_output_state) = false;'
+      - script.execute: refresh_output
 
   - id: a_do_on
     then:
       - if:
-          condition:
-            lambda: 'return id(mode_a).state != "Smart only";'
-          then:
-            - switch.turn_on: relay_a
+          condition: { lambda: 'return id(mode_a).state != "Smart only";' }
+          then: { switch.turn_on: relay_a }
       - if:
-          condition:
-            lambda: 'return strlen("${a_on_entity}") > 0;'
+          condition: { lambda: 'return strlen("${a_on_entity}") > 0;' }
           then:
             - if:
-                condition:
-                  lambda: 'return ${a_on_kelvin} != 0 && ${a_on_brightness_pct} != 0;'
+                condition: { lambda: 'return ${a_on_kelvin} != 0 && ${a_on_brightness_pct} != 0;' }
                 then:
                   - homeassistant.service:
                       service: ${a_on_service}
@@ -566,8 +484,7 @@ script:
                         kelvin: !lambda 'return ${a_on_kelvin};'
                         brightness_pct: !lambda 'return ${a_on_brightness_pct};'
             - if:
-                condition:
-                  lambda: 'return ${a_on_kelvin} != 0 && ${a_on_brightness_pct} == 0;'
+                condition: { lambda: 'return ${a_on_kelvin} != 0 && ${a_on_brightness_pct} == 0;' }
                 then:
                   - homeassistant.service:
                       service: ${a_on_service}
@@ -575,8 +492,7 @@ script:
                         entity_id: ${a_on_entity}
                         kelvin: !lambda 'return ${a_on_kelvin};'
             - if:
-                condition:
-                  lambda: 'return ${a_on_kelvin} == 0 && ${a_on_brightness_pct} != 0;'
+                condition: { lambda: 'return ${a_on_kelvin} == 0 && ${a_on_brightness_pct} != 0;' }
                 then:
                   - homeassistant.service:
                       service: ${a_on_service}
@@ -584,20 +500,14 @@ script:
                         entity_id: ${a_on_entity}
                         brightness_pct: !lambda 'return ${a_on_brightness_pct};'
             - if:
-                condition:
-                  lambda: 'return ${a_on_kelvin} == 0 && ${a_on_brightness_pct} == 0;'
+                condition: { lambda: 'return ${a_on_kelvin} == 0 && ${a_on_brightness_pct} == 0;' }
                 then:
                   - homeassistant.service:
                       service: ${a_on_service}
                       data:
                         entity_id: ${a_on_entity}
-      - binary_sensor.template.publish:
-          id: a_effective_state
-          state: !lambda |-
-            bool ha_on = (id(a_state).has_state() && id(a_state).state == "on");
-            bool rel_on = id(relay_a).state;
-            std::string m = id(mode_a).state;
-            if (m == "Relay only") return rel_on;
-            if (m == "Smart only") return ha_on;
-            return (ha_on || rel_on);
-      - script.execute: update_indicator
+      - if:
+          condition: { lambda: 'return id(mode_a).state == "Smart only";' }
+          then:
+            - lambda: 'id(a_output_state) = true;'
+      - script.execute: refresh_output
