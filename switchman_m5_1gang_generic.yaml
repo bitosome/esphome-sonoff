@@ -1,10 +1,11 @@
 # Generic package for Sonoff SwitchMan M5 (1-gang, EU)
-# - Modes: Local / HA only / Both
-# - Gestures: single (ON/OFF semantics), double (fan-out), hold (loop while pressed)
+# - Modes: Local / HA only / Both (visible as a Select in HA)
+# - Relay behavior: Latching / Momentary 200ms / Inching (with seconds)
+# - Gestures: single (ON/OFF semantics), double (fan-out), hold (loop)
 # - Offline behavior: relay-only; online resumes configured behavior
-# - Indicator: panel backlight brightens when the followed entity is ON
+# - Indicator: Panel Backlight turns on only when the followed entity is ON
 #
-# NOTE: Define wifi:/api:/ota: in your per-device file. This package assumes api: is present.
+# Define wifi:/api:/ota: in your per-device file. This package assumes api: is present.
 
 substitutions:
   device_name: ""
@@ -15,7 +16,7 @@ substitutions:
 
   # Single-press ON path (used when the followed entity is currently OFF)
   a_on_service: "switch.turn_on"     # e.g. "light.turn_on"
-  a_on_entity: ""                    # e.g. "light.room_main"
+  a_on_entity: ""
   a_on_kelvin: "0"                   # optional; "0" = not sent
   a_on_brightness_pct: "0"           # optional; "0" = not sent
 
@@ -65,9 +66,10 @@ light:
     id: panel_backlight
     name: "${device_friendly_name} Panel Backlight"
     output: panel_pwm
-    restore_mode: ALWAYS_ON
+    restore_mode: RESTORE_DEFAULT_OFF      # now starts OFF
     default_transition_length: 0s
 
+# --- Relay A with HA-only guard + behavior shaping on ON ---
 switch:
   - platform: gpio
     id: relay_a
@@ -83,7 +85,27 @@ switch:
                 - api.connected
             then:
               - switch.turn_on: relay_a
+    on_turn_on:
+      then:
+        # Apply behavior shaping only when not HA-only (we're allowed to touch the relay)
+        - if:
+            condition:
+              lambda: 'return id(mode_a).state != "HA only";'
+            then:
+              - if:
+                  condition:
+                    lambda: 'return id(behavior_a).state == "Momentary 200ms";'
+                  then:
+                    - delay: 200ms
+                    - switch.turn_off: relay_a
+              - if:
+                  condition:
+                    lambda: 'return id(behavior_a).state == "Inching";'
+                  then:
+                    - delay: !lambda 'return (uint32_t)(id(inching_a_secs).state * 1000);'
+                    - switch.turn_off: relay_a
 
+# --- User-configurable selects/numbers visible in HA ---
 select:
   - platform: template
     id: mode_a
@@ -95,6 +117,31 @@ select:
     optimistic: true
     restore_value: true
     initial_option: ${default_mode_a}
+    entity_category: config
+
+  - platform: template
+    id: behavior_a
+    name: "${device_friendly_name} – Relay A behavior"
+    options:
+      - Latching
+      - Momentary 200ms
+      - Inching
+    optimistic: true
+    restore_value: true
+    initial_option: "Latching"
+    entity_category: config
+
+number:
+  - platform: template
+    id: inching_a_secs
+    name: "${device_friendly_name} – Inching A (s)"
+    min_value: 1
+    max_value: 600
+    step: 1
+    initial_value: 5
+    optimistic: true
+    restore_value: true
+    entity_category: config
 
 esphome:
   on_boot:
@@ -109,6 +156,7 @@ esphome:
             - switch.turn_on: relay_a
 
 binary_sensor:
+  # Physical button
   - platform: gpio
     id: btn_a
     pin:
@@ -124,7 +172,7 @@ binary_sensor:
         max_length: 400ms
         then:
           - script.execute: a_single
-    # Double click (if your build lacks on_double_click, we can swap to on_multi_click)
+    # Double click
     on_double_click:
       - min_length: 50ms
         max_length: 350ms
@@ -142,6 +190,20 @@ binary_sensor:
     on_release:
       then:
         - script.stop: a_hold_loop
+
+  # Dashboard-friendly state: ON when the *effective output* is ON
+  # (uses followed HA entity when online; otherwise mirrors the relay)
+  - platform: template
+    id: a_effective_state
+    name: "${device_friendly_name} Button A state"
+    device_class: power
+    lambda: |-
+      if (id(a_state).has_state()) {
+        return id(a_state).state == "on";
+      } else {
+        return id(relay_a).state;
+      }
+    update_interval: 1s
 
 # Follow HA entity for state & indicator (falls back to relay when HA is offline)
 text_sensor:
@@ -165,14 +227,18 @@ globals:
     initial_value: 'false'
 
 script:
-  # Indicator brightness based on followed entity
+  # Indicator: backlight ON (70%) when followed entity is ON, otherwise OFF
   - id: update_indicator
     then:
       - lambda: |-
           bool on = (id(a_state).has_state() && id(a_state).state == "on");
-          auto call = id(panel_backlight).turn_on();
-          call.set_brightness(on ? 0.70f : 0.15f);
-          call.perform();
+          if (on) {
+            auto call = id(panel_backlight).turn_on();
+            call.set_brightness(0.70f);
+            call.perform();
+          } else {
+            id(panel_backlight).turn_off();
+          }
 
   # --- Single press: decides OFF vs ON; offline = relay toggle only ---
   - id: a_single
