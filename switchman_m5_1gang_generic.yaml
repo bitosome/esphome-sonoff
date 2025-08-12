@@ -6,6 +6,7 @@
 #
 # Output entity: "${device_friendly_name} Switch Button A state"
 # Backlight follows output. Blue/Red LEDs exposed.
+# Blue indicator LED (GPIO5) follows the output (button/switch state) too.
 
 substitutions:
   device_name: ""
@@ -38,6 +39,7 @@ substitutions:
   a_hold_step_pct: "0"
 
   default_mode_a: "Relay only"  # Relay only | Smart only | Smart + Relay
+  blue_led_inverted: "false"     # flip to "true" if your blue indicator looks inverted
 
 esphome:
   name: ${device_name}
@@ -56,10 +58,11 @@ esphome:
 
 logger:
 
-status_led:
-  pin: GPIO5
+# NOTE: We DO NOT use status_led: here, because we want full control of the blue LED.
+# (status_led would blink on connectivity issues and fight our desired behavior)
 
 output:
+  # Blue/backlight (panel) PWM
   - platform: ledc
     id: panel_pwm
     pin: GPIO18
@@ -70,8 +73,15 @@ output:
     id: red_led_out
     pin: GPIO19
 
+  # Blue indicator LED (binary pin). Invert if your hardware requires it.
+  - platform: gpio
+    id: blue_led_out
+    pin:
+      number: GPIO5
+      inverted: ${blue_led_inverted}
+
 light:
-  # Blue/backlight
+  # Panel backlight (named “Blue LED” to match existing UI)
   - platform: monochromatic
     id: panel_backlight
     name: "${device_friendly_name} Blue LED"
@@ -84,6 +94,12 @@ light:
     id: panel_red_led
     name: "${device_friendly_name} Red LED"
     output: red_led_out
+
+  # Blue indicator LED (follows the button/output state)
+  - platform: binary
+    id: panel_blue_indicator
+    name: "${device_friendly_name} Blue Indicator LED"
+    output: blue_led_out
 
 switch:
   # Physical relay
@@ -276,7 +292,7 @@ button:
     name: "${device_friendly_name} Restart"
 
 script:
-  # Compute effective output, publish it, and set backlight to match
+  # Compute effective output, publish it, and set LEDs to match
   - id: refresh_output
     then:
       - lambda: |-
@@ -292,8 +308,10 @@ script:
             auto c = id(panel_backlight).turn_on();
             c.set_brightness(0.70f);
             c.perform();
+            id(panel_blue_indicator).turn_on();
           } else {
             id(panel_backlight).turn_off();
+            id(panel_blue_indicator).turn_off();
           }
 
   # Single press (offline → relay toggle)
