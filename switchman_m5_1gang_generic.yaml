@@ -61,7 +61,6 @@ web_server:
   port: 80
 
 # No status_led: we drive LEDs ourselves.
-# No status_led: we drive LEDs ourselves.
 
 output:
   # Backlight PWM (Blue LED)
