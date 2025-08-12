@@ -61,6 +61,7 @@ web_server:
   port: 80
 
 # No status_led: we drive LEDs ourselves.
+# No status_led: we drive LEDs ourselves.
 
 output:
   # Backlight PWM (Blue LED)
@@ -234,6 +235,7 @@ sensor:
     update_interval: 60s
 
 text_sensor:
+  # Follow HA entity (uses device_slug to avoid hyphens)
   - platform: homeassistant
     id: a_state
     internal: true
