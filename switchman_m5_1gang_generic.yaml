@@ -1,55 +1,15 @@
-# Sonoff SwitchMan M5 — 1-gang generic
-# Modes:
-# - Relay only      → relay only
-# - Smart only      → HA services only
-# - Smart + Relay   → both; output = OR(HA, relay)
-#
-# Output entity: "Switch Button A state"
-# Indicator LED select: Blue | Red | None
-#
-# In your mini, set:
-#   device_name: office-light-switch-1
-#   device_friendly_name: Office light switch 1
-#   device_slug: office_light_switch_1   # underscore for HA entity IDs
-
 substitutions:
-  device_name: ""
-  device_friendly_name: ""
-  device_slug: ""
+  device_model: "Switchman M5 (1-Gang)"
+  device_make: "Sonoff"
+  package_version: "3.0.0"
 
-  a_follow_entity: "switch.${device_slug}_relay_a"
-
-  a_on_service: "switch.turn_on"
-  a_on_entity: ""
-  a_on_kelvin: "0"
-  a_on_brightness_pct: "0"
-
-  a_off_service: "switch.turn_off"
-  a_off_entity: ""
-
-  a_double_service: ""
-  a_double_entity: ""
-  a_double_service2: ""
-  a_double_entity2: ""
-  a_double_service3: ""
-  a_double_entity3: ""
-  a_double_step_pct: "0"
-
-  a_hold_service: ""
-  a_hold_entity: ""
-  a_hold_service2: ""
-  a_hold_entity2: ""
-  a_hold_service3: ""
-  a_hold_entity3: ""
-  a_hold_step_pct: "0"
-
-  default_mode_a: "Relay only"        # Relay only | Smart only | Smart + Relay
   indicator_led_default: "Blue"        # Blue | Red | None
   backlight_brightness_pct: "70"       # 0–100 (for Blue LED when used as indicator)
 
 esphome:
   name: ${device_name}
   friendly_name: ${device_friendly_name}
+  comment: "${device_model} by ${device_make} version ${package_version}"
   on_boot:
     priority: -100
     then:
@@ -62,7 +22,43 @@ esphome:
             - switch.turn_on: relay_a
       - script.execute: refresh_output
 
+ log_level: INFO
+  timezone: "Europe/Tallinn"
+
 logger:
+  level: "${log_level}"
+  baud_rate: 0
+
+time:
+  - platform: sntp
+    id: time_service
+    timezone: ${timezone}
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+wifi:
+  ssid: ${wifi_ssid}
+  password: ${wifi_password}
+  ap:
+    ssid: "${device_friendly_name} Fallback"
+    password: ${ap_password}
+
+api:
+  encryption:
+    key: ${api_key}
+  reboot_timeout: 0s
+
+ota:
+  - platform: esphome
+    password: ${ota_password}
+
+captive_portal:
+
+web_server:
+  port: 80
 
 # No status_led: we drive LEDs ourselves.
 
