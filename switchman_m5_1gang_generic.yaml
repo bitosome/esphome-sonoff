@@ -1,14 +1,14 @@
 substitutions:
   device_model: "Switchman M5 (1-Gang)"
   device_make: "Sonoff"
-  package_version: "3.1.1"
+  package_version: "3.1.2"
 
-  # Use slug (underscores) for HA entity IDs
+  # Safe default for HA entity to follow (uses slug/underscores)
   a_follow_entity: "switch.${device_slug}_relay_a"
 
   # LEDs & backlight behavior
   indicator_led_default: "Red"        # Blue | Red | None
-  backlight_brightness_pct: "70"      # 0–100 (used only when Blue is the indicator & output is ON)
+  backlight_brightness_pct: "70"      # Used only when Blue is the indicator & output is ON
 
   # Mode default
   default_mode_a: "Smart + Relay"     # Relay only | Smart only | Smart + Relay
@@ -71,7 +71,7 @@ web_server:
 # We drive LEDs ourselves.
 
 output:
-  # Blue backlight (active-low on M5) → invert PWM so OFF really means dark
+  # Blue backlight (active-low on many M5 revisions) → invert PWM so OFF is dark
   - platform: ledc
     id: panel_pwm
     pin:
@@ -351,8 +351,7 @@ script:
   - id: a_single
     then:
       - if:
-          condition:
-            api.connected
+          condition: api.connected
           then:
             - lambda: |-
                 bool ha_on = (id(a_state).has_state() && id(a_state).state == "on");
@@ -451,17 +450,15 @@ script:
                   lambda: 'return id(mode_a).state == "Smart only";'
                 then:
                   - lambda: 'id(a_output_state) = !id(a_output_state);'
-                  - script.execute: refresh_output
-              else:
-                - switch.toggle: relay_a
-                - script.execute: refresh_output
+                else:
+                  - switch.toggle: relay_a
+            - script.execute: refresh_output
 
   # Double click
   - id: a_double
     then:
       - if:
-          condition:
-            api.connected
+          condition: api.connected
           then:
             - if:
                 condition:
@@ -498,7 +495,6 @@ script:
                       data:
                         entity_id: ${a_double_entity3}
           else:
-            # OFFLINE: never touch relay in Smart only
             - if:
                 condition:
                   lambda: 'return id(mode_a).state != "Smart only";'
@@ -510,8 +506,7 @@ script:
   - id: a_hold_tick
     then:
       - if:
-          condition:
-            api.connected
+          condition: api.connected
           then:
             - if:
                 condition:
