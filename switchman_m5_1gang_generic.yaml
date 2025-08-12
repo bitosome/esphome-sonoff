@@ -1,11 +1,11 @@
 # Generic package for Sonoff SwitchMan M5 (1-gang, EU)
-# - Modes: Local / HA only / Both (visible as a Select in HA)
+# - Modes: Local / HA only / Both (visible in HA)
 # - Relay behavior: Latching / Momentary 200ms / Inching (with seconds)
 # - Gestures: single (ON/OFF semantics), double (fan-out), hold (loop)
 # - Offline behavior: relay-only; online resumes configured behavior
-# - Indicator: Panel Backlight turns on only when the followed entity is ON
+# - Indicator: Panel Backlight ON only when the followed entity (or relay if offline) is ON
 #
-# Define wifi:/api:/ota: in your per-device file. This package assumes api: is present.
+# NOTE: Define wifi:/api:/ota: in your per-device file. This package assumes api: is present.
 
 substitutions:
   device_name: ""
@@ -15,13 +15,13 @@ substitutions:
   a_follow_entity: "switch.${device_name}_relay_a"
 
   # Single-press ON path (used when the followed entity is currently OFF)
-  a_on_service: "switch.turn_on"     # e.g. "light.turn_on"
-  a_on_entity: ""
-  a_on_kelvin: "0"                   # optional; "0" = not sent
-  a_on_brightness_pct: "0"           # optional; "0" = not sent
+  a_on_service: "switch.turn_on"       # e.g. "light.turn_on"
+  a_on_entity: ""                      # e.g. "light.room_main"
+  a_on_kelvin: "0"                     # optional; "0" = not sent
+  a_on_brightness_pct: "0"             # optional; "0" = not sent
 
   # Single-press OFF path (used when the followed entity is currently ON)
-  a_off_service: "switch.turn_off"   # e.g. "light.turn_off"
+  a_off_service: "switch.turn_off"     # e.g. "light.turn_off"
   a_off_entity: ""
 
   # Double-click fan-out (up to 3 service calls; optional)
@@ -31,7 +31,7 @@ substitutions:
   a_double_entity2: ""
   a_double_service3: ""
   a_double_entity3: ""
-  a_double_step_pct: "0"             # for light.turn_on; "0" = not sent
+  a_double_step_pct: "0"               # for light.turn_on; "0" = not sent
 
   # Hold (repeats ~150ms while pressed & online; up to 3 calls; optional)
   a_hold_service: ""
@@ -40,10 +40,10 @@ substitutions:
   a_hold_entity2: ""
   a_hold_service3: ""
   a_hold_entity3: ""
-  a_hold_step_pct: "0"               # for light.turn_on; "0" = not sent
+  a_hold_step_pct: "0"                 # for light.turn_on; "0" = not sent
 
   # Default operating mode for this gang
-  default_mode_a: "Local"            # Local | HA only | Both
+  default_mode_a: "Local"              # Local | HA only | Both
 
 logger:
 
@@ -66,7 +66,7 @@ light:
     id: panel_backlight
     name: "${device_friendly_name} Panel Backlight"
     output: panel_pwm
-    restore_mode: RESTORE_DEFAULT_OFF      # now starts OFF
+    restore_mode: RESTORE_DEFAULT_OFF
     default_transition_length: 0s
 
 # --- Relay A with HA-only guard + behavior shaping on ON ---
@@ -75,9 +75,10 @@ switch:
     id: relay_a
     name: "${device_friendly_name} Relay A"
     pin: GPIO23
-    # Keep bulbs powered in HA-only *only when* HA/API is connected
     on_turn_off:
       then:
+        - component.update: a_effective_state
+        - script.execute: update_indicator
         - if:
             condition:
               and:
@@ -87,6 +88,8 @@ switch:
               - switch.turn_on: relay_a
     on_turn_on:
       then:
+        - component.update: a_effective_state
+        - script.execute: update_indicator
         # Apply behavior shaping only when not HA-only (we're allowed to touch the relay)
         - if:
             condition:
@@ -154,6 +157,7 @@ esphome:
               - lambda: 'return id(mode_a).state == "HA only";'
           then:
             - switch.turn_on: relay_a
+      - script.execute: update_indicator
 
 binary_sensor:
   # Physical button
@@ -200,10 +204,8 @@ binary_sensor:
     lambda: |-
       if (id(a_state).has_state()) {
         return id(a_state).state == "on";
-      } else {
-        return id(relay_a).state;
       }
-    update_interval: 1s
+      return id(relay_a).state;
 
 # Follow HA entity for state & indicator (falls back to relay when HA is offline)
 text_sensor:
@@ -218,6 +220,7 @@ text_sensor:
             } else if (id(a_state).state == "off") {
               id(a_last_known_on) = false;
             }
+        - component.update: a_effective_state
         - script.execute: update_indicator
 
 globals:
@@ -227,11 +230,17 @@ globals:
     initial_value: 'false'
 
 script:
-  # Indicator: backlight ON (70%) when followed entity is ON, otherwise OFF
+  # Indicator: backlight ON (70%) when followed entity is ON; else OFF
+  # When HA state is missing (offline), we fall back to the relay state.
   - id: update_indicator
     then:
       - lambda: |-
-          bool on = (id(a_state).has_state() && id(a_state).state == "on");
+          bool on = false;
+          if (id(a_state).has_state()) {
+            on = (id(a_state).state == "on");
+          } else {
+            on = id(relay_a).state;
+          }
           if (on) {
             auto call = id(panel_backlight).turn_on();
             call.set_brightness(0.70f);
@@ -280,7 +289,7 @@ script:
                         lambda: 'return id(mode_a).state != "HA only";'
                       then:
                         - switch.turn_on: relay_a
-                  # build service call with optional fields
+                  # Build service call with optional fields
                   - if:
                       condition:
                         lambda: 'return strlen("${a_on_entity}") > 0;'
