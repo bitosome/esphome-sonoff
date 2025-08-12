@@ -4,6 +4,7 @@
 # - Gestures: single (ON/OFF semantics), double (fan-out), hold (loop)
 # - Offline behavior: relay-only; online resumes configured behavior
 # - Indicator: Panel Backlight ON only when the followed entity (or relay if offline) is ON
+# - Diagnostics: WiFi RSSI, Uptime, ESPHome Version, IP/SSID/BSSID/MAC, Status
 #
 # NOTE: Define wifi:/api:/ota: in your per-device file. This package assumes api: is present.
 
@@ -237,8 +238,22 @@ binary_sensor:
       }
       return id(relay_a).state;
 
-# Follow HA entity for state & indicator (falls back to relay when HA is offline)
+  # Online status
+  - platform: status
+    name: "${device_friendly_name} Status"
+
+# Sensors / Diagnostics
+sensor:
+  - platform: wifi_signal
+    name: "${device_friendly_name} WiFi RSSI"
+    update_interval: 60s
+
+  - platform: uptime
+    name: "${device_friendly_name} Uptime"
+    update_interval: 60s
+
 text_sensor:
+  # Follow HA entity for state & indicator (falls back to relay when HA is offline)
   - platform: homeassistant
     id: a_state
     internal: true
@@ -260,11 +275,41 @@ text_sensor:
               return on;
         - script.execute: update_indicator
 
+  - platform: version
+    name: "${device_friendly_name} ESPHome Version"
+
+  - platform: wifi_info
+    ip_address:
+      name: "${device_friendly_name} IP"
+    ssid:
+      name: "${device_friendly_name} SSID"
+    bssid:
+      name: "${device_friendly_name} BSSID"
+    mac_address:
+      name: "${device_friendly_name} MAC"
+
 globals:
   - id: a_last_known_on
     type: bool
     restore_value: no
     initial_value: 'false'
+
+button:
+  # Trigger the same logic as a physical double click (no physical press needed)
+  - platform: template
+    name: "${device_friendly_name} Simulate Double Click"
+    on_press:
+      - script.execute: a_double
+
+  # Trigger a short "hold burst" (~1.5s) without physical press
+  - platform: template
+    name: "${device_friendly_name} Simulate Hold (1.5s)"
+    on_press:
+      - script.execute: a_hold_burst
+
+  # Utility
+  - platform: restart
+    name: "${device_friendly_name} Restart"
 
 script:
   # Indicator: backlight ON (70%) when followed entity is ON; else OFF
@@ -297,7 +342,7 @@ script:
             - lambda: |-
                 bool is_on = id(a_last_known_on);
                 if (!id(a_state).has_state()) { is_on = id(relay_a).state; }
-                id(a_last_known_on) = !is_on;  # target state after this press
+                id(a_last_known_on) = !is_on;  // target state after this press
             # OFF path
             - if:
                 condition:
@@ -415,14 +460,12 @@ script:
           else:
             - switch.toggle: relay_a
 
-  # --- Hold: loop while pressed & online; emits up to 3 service calls per tick ---
-  - id: a_hold_loop
+  # --- Reusable: one "tick" of hold behavior (used by real holds and HA buttons) ---
+  - id: a_hold_tick
     then:
-      - while:
+      - if:
           condition:
-            and:
-              - binary_sensor.is_on: btn_a
-              - api.connected
+            api.connected
           then:
             - if:
                 condition:
@@ -458,6 +501,26 @@ script:
                       service: ${a_hold_service3}
                       data:
                         entity_id: ${a_hold_entity3}
+
+  # --- Real hold loop (physical press) ---
+  - id: a_hold_loop
+    then:
+      - while:
+          condition:
+            and:
+              - binary_sensor.is_on: btn_a
+              - api.connected
+          then:
+            - script.execute: a_hold_tick
+            - delay: 150ms
+
+  # --- HA button to emulate a ~1.5s hold (10 ticks @150ms) ---
+  - id: a_hold_burst
+    then:
+      - repeat:
+          count: 10
+          then:
+            - script.execute: a_hold_tick
             - delay: 150ms
 
   # --- Explicit actions used by the Virtual Output switch (no HA helpers needed) ---
