@@ -1,14 +1,16 @@
 substitutions:
   device_model: "Switchman M5 (1-Gang)"
   device_make: "Sonoff"
-  package_version: "3.1.2"
+  package_version: "3.1.3"
 
   # Safe default for HA entity to follow (uses slug/underscores)
   a_follow_entity: "switch.${device_slug}_relay_a"
 
-  # LEDs & backlight behavior
+  # Blue backlight brightness when it's supposed to be ON (0–100)
+  backlight_brightness_pct: "70"
+
+  # Which LED reflects the effective output by default
   indicator_led_default: "Red"        # Blue | Red | None
-  backlight_brightness_pct: "70"      # Used only when Blue is the indicator & output is ON
 
   # Mode default
   default_mode_a: "Smart + Relay"     # Relay only | Smart only | Smart + Relay
@@ -23,6 +25,11 @@ esphome:
   on_boot:
     priority: -100
     then:
+      # Force both LEDs fully OFF at boot to avoid residual glow
+      - output.set_level:
+          id: panel_pwm
+          level: 1.0      # 1.0 => pin HIGH => blue off on active-low hardware
+      - output.turn_off: red_led_out
       # Ensure power stays fed in Smart only (decoupled) mode
       - if:
           condition:
@@ -68,37 +75,18 @@ captive_portal:
 web_server:
   port: 80
 
-# We drive LEDs ourselves.
-
+# We drive LEDs with raw outputs (no light entities to avoid restore/transition quirks).
 output:
-  # Blue backlight (active-low on many M5 revisions) → invert PWM so OFF is dark
+  # Blue backlight (active-low on M5). Do NOT invert; we compute levels explicitly.
   - platform: ledc
     id: panel_pwm
-    pin:
-      number: GPIO18
-      inverted: true
+    pin: GPIO18
     frequency: 1000 Hz
 
-  # Red LED (digital)
+  # Red LED (active-high digital)
   - platform: gpio
     id: red_led_out
-    pin:
-      number: GPIO19
-
-light:
-  # Blue LED (panel backlight)
-  - platform: monochromatic
-    id: panel_backlight
-    name: "Blue LED"
-    output: panel_pwm
-    restore_mode: RESTORE_DEFAULT_OFF
-    default_transition_length: 0s
-
-  # Red LED
-  - platform: binary
-    id: panel_red_led
-    name: "Red LED"
-    output: red_led_out
+    pin: GPIO19
 
 switch:
   # Physical relay
@@ -312,7 +300,8 @@ script:
           else eff = (ha_on || rel_on);
           id(a_output).publish_state(eff);
 
-      # Blue is ON only when Indicator=Blue AND effective output is ON
+      # Blue LED control via raw PWM; Red via digital output.
+      # OFF is enforced as: panel_pwm level = 1.0 (pin HIGH on active-low => dark), red off.
       - if:
           condition:
             lambda: 'return id(indicator_led).state == std::string("Blue");'
@@ -321,13 +310,16 @@ script:
                 condition:
                   lambda: 'return id(a_output).state;'
                 then:
-                  - light.turn_on:
-                      id: panel_backlight
-                      brightness: !lambda 'return ${backlight_brightness_pct} / 100.0f;'
-                  - light.turn_off: panel_red_led
+                  # Blue ON at requested brightness (active-low => 1.0 - pct)
+                  - output.set_level:
+                      id: panel_pwm
+                      level: !lambda 'return 1.0f - (${backlight_brightness_pct} / 100.0f);'
+                  - output.turn_off: red_led_out
                 else:
-                  - light.turn_off: panel_backlight
-                  - light.turn_off: panel_red_led
+                  - output.set_level:
+                      id: panel_pwm
+                      level: 1.0
+                  - output.turn_off: red_led_out
           else:
             - if:
                 condition:
@@ -337,15 +329,21 @@ script:
                       condition:
                         lambda: 'return id(a_output).state;'
                       then:
-                        - light.turn_off: panel_backlight
-                        - light.turn_on: panel_red_led
+                        - output.set_level:
+                            id: panel_pwm
+                            level: 1.0
+                        - output.turn_on: red_led_out
                       else:
-                        - light.turn_off: panel_backlight
-                        - light.turn_off: panel_red_led
+                        - output.set_level:
+                            id: panel_pwm
+                            level: 1.0
+                        - output.turn_off: red_led_out
                 else:
-                  # None selected → both LEDs off
-                  - light.turn_off: panel_backlight
-                  - light.turn_off: panel_red_led
+                  # None selected → both OFF, enforce dark
+                  - output.set_level:
+                      id: panel_pwm
+                      level: 1.0
+                  - output.turn_off: red_led_out
 
   # Single press
   - id: a_single
