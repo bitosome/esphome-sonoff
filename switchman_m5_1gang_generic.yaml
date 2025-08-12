@@ -1,19 +1,21 @@
 # Sonoff SwitchMan M5 — 1-gang generic
 # Modes:
 # - Relay only      → relay only
-# - Smart only      → HA services only (keep relay powered when online)
+# - Smart only      → HA services only
 # - Smart + Relay   → both; output = OR(HA, relay)
 #
 # Output entity: "Switch Button A state"
-# Backlight + Blue indicator follow the effective output state.
+# Backlight (Blue LED) and the blue indicator (GPIO5) follow the effective output.
 #
-# NOTE: Set `device_slug` in your mini to the underscore form of device_name (no hyphens),
-# e.g. device_name: office-light-switch-1  →  device_slug: office_light_switch_1
+# NOTE: In your mini, set:
+#   device_name: office-light-switch-1
+#   device_friendly_name: Office light switch 1
+#   device_slug: office_light_switch_1   # underscore version for HA entity IDs
 
 substitutions:
   device_name: ""
   device_friendly_name: ""
-  device_slug: ""   # <-- REQUIRED: underscore version for HA entity ids
+  device_slug: ""
 
   a_follow_entity: "switch.${device_slug}_relay_a"
 
@@ -41,8 +43,8 @@ substitutions:
   a_hold_entity3: ""
   a_hold_step_pct: "0"
 
-  default_mode_a: "Relay only"  # Relay only | Smart only | Smart + Relay
-  blue_led_inverted: "false"     # flip to "true" if your blue indicator looks inverted
+  default_mode_a: "Relay only"      # Relay only | Smart only | Smart + Relay
+  blue_led_inverted: "false"         # flip true if your blue indicator looks inverted
 
 esphome:
   name: ${device_name}
@@ -61,7 +63,7 @@ esphome:
 
 logger:
 
-# We do NOT use status_led: here; we control the blue LED ourselves to mirror output.
+# We do NOT use status_led: we control the blue indicator ourselves.
 
 output:
   # Backlight PWM (panel LED driver)
@@ -70,7 +72,7 @@ output:
     pin: GPIO18
     frequency: 1000 Hz
 
-  # Red LED (digital output; adjust pin if your hardware differs)
+  # Red LED (digital output)
   - platform: gpio
     id: red_led_out
     pin: GPIO19
@@ -83,7 +85,7 @@ output:
       inverted: ${blue_led_inverted}
 
 light:
-  # Panel backlight (“Blue LED” in UI → HA will prefix device name automatically)
+  # Panel backlight (HA will prefix device name automatically)
   - platform: monochromatic
     id: panel_backlight
     name: "Blue LED"
@@ -96,12 +98,6 @@ light:
     id: panel_red_led
     name: "Red LED"
     output: red_led_out
-
-  # Blue indicator LED (follows the button/output state)
-  - platform: binary
-    id: panel_blue_indicator
-    name: "Blue Indicator LED"
-    output: blue_led_out
 
 switch:
   # Physical relay
@@ -131,15 +127,9 @@ switch:
     on_turn_off:
       then:
         - script.execute: refresh_output
-        - if:
-            condition:
-              and:
-                - lambda: 'return id(mode_a).state == "Smart only";'
-                - api.connected
-            then:
-              - switch.turn_on: relay_a
+        # REMOVED: auto-turn-on in Smart only (so you can turn relay OFF in Smart mode)
 
-  # HA-facing output (the one you control in HA)
+  # HA-facing effective output
   - platform: template
     id: a_output
     name: "Switch Button A state"
@@ -151,17 +141,17 @@ switch:
       if (m == "Relay only") return rel_on;
       if (m == "Smart only") return id(a_output_state);
       return (ha_on || rel_on);
-    # Ensure LEDs follow immediately on user actions
+    # Keep LEDs perfectly in sync with user actions
     turn_on_action:
       - script.execute: a_do_on
-      - light.turn_on: panel_blue_indicator
+      - output.turn_on: blue_led_out
       - light.turn_on:
           id: panel_backlight
           brightness: 70%
       - script.execute: refresh_output
     turn_off_action:
       - script.execute: a_do_off
-      - light.turn_off: panel_blue_indicator
+      - output.turn_off: blue_led_out
       - light.turn_off: panel_backlight
       - script.execute: refresh_output
 
@@ -248,7 +238,7 @@ sensor:
     update_interval: 60s
 
 text_sensor:
-  # Follow HA entity (built from device_slug to avoid hyphens)
+  # Follow HA entity (uses device_slug to avoid hyphens)
   - platform: homeassistant
     id: a_state
     internal: true
@@ -319,10 +309,10 @@ script:
             auto c = id(panel_backlight).turn_on();
             c.set_brightness(0.70f);
             c.perform();
-            id(panel_blue_indicator).turn_on();
+            id(blue_led_out).turn_on();
           } else {
             id(panel_backlight).turn_off();
-            id(panel_blue_indicator).turn_off();
+            id(blue_led_out).turn_off();
           }
 
   # Single press (offline → relay toggle)
