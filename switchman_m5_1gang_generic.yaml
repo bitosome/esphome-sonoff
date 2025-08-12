@@ -6,6 +6,9 @@ substitutions:
   indicator_led_default: "Blue"        # Blue | Red | None
   backlight_brightness_pct: "70"       # 0–100 (for Blue LED when used as indicator)
 
+  log_level: INFO
+  timezone: "Europe/Tallinn"
+
 esphome:
   name: ${device_name}
   friendly_name: ${device_friendly_name}
@@ -21,9 +24,6 @@ esphome:
           then:
             - switch.turn_on: relay_a
       - script.execute: refresh_output
-
- log_level: INFO
-  timezone: "Europe/Tallinn"
 
 logger:
   level: "${log_level}"
@@ -234,7 +234,6 @@ sensor:
     update_interval: 60s
 
 text_sensor:
-  # Follow HA entity (uses device_slug to avoid hyphens)
   - platform: homeassistant
     id: a_state
     internal: true
