@@ -1,7 +1,7 @@
 substitutions:
   device_model: "Switchman M5 (1-Gang)"
   device_make: "Sonoff"
-  package_version: "3.2.0"
+  package_version: "3.2.1"
 
   # Safe default for HA entity to follow (uses slug/underscores)
   a_follow_entity: "switch.${device_slug}_relay_a"
@@ -338,19 +338,21 @@ script:
             - output.set_level:
                 id: panel_pwm
                 level: !lambda 'return (1.0f - (${backlight_brightness_pct} / 100.0f));'  # ON for active-low
+
       - if:
           condition:
             lambda: 'return id(indicator_led).state == std::string("Red") && id(a_output).state;'
           then:
             - output.turn_on: red_led_out
 
-      # If no indicator is selected, allow status LED ONLY when disconnected
+      # If no indicator selected, allow status LED ONLY when disconnected
       - if:
           condition:
             and:
               - lambda: 'return id(indicator_led).state == std::string("None");'
               - not:
-                  condition: api.connected
+                  condition:
+                    api.connected:
           then:
             - output.turn_on: blue_status_led
 
