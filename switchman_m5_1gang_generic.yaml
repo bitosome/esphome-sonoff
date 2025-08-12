@@ -95,6 +95,7 @@ output:
     id: red_led_out
     pin:
       number: GPIO19
+      inverted: true
 
   # Small blue STATUS LED on GPIO5 (active-low)
   - platform: gpio
