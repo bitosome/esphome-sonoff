@@ -1,7 +1,7 @@
 substitutions:
   device_model: "Switchman M5 (1-Gang)"
   device_make: "Sonoff"
-  package_version: "3.2.1"
+  package_version: "3.2.2"
 
   # Safe default for HA entity to follow (uses slug/underscores)
   a_follow_entity: "switch.${device_slug}_relay_a"
@@ -66,21 +66,12 @@ api:
   encryption:
     key: ${api_key}
   reboot_timeout: 0s
-
-  # Keep status LED off when connected; allow it only when disconnected AND no indicator is selected.
   on_client_connected:
     then:
-      - output.turn_off: blue_status_led
       - script.execute: refresh_output
   on_client_disconnected:
     then:
-      - if:
-          condition:
-            lambda: 'return id(indicator_led).state == std::string("None");'
-          then:
-            - output.turn_on: blue_status_led
-          else:
-            - output.turn_off: blue_status_led
+      - script.execute: refresh_output
 
 ota:
   - platform: esphome
@@ -351,8 +342,7 @@ script:
             and:
               - lambda: 'return id(indicator_led).state == std::string("None");'
               - not:
-                  condition:
-                    api.connected:
+                  api.connected:
           then:
             - output.turn_on: blue_status_led
 
