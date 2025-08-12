@@ -80,7 +80,7 @@ switch:
             condition:
               and:
                 - lambda: 'return id(mode_a).state == "HA only";'
-                - lambda: 'return api_connected;'
+                - api.connected
             then:
               - switch.turn_on: relay_a
 
@@ -103,7 +103,7 @@ esphome:
       - if:
           condition:
             and:
-              - lambda: 'return api_connected;'
+              - api.connected
               - lambda: 'return id(mode_a).state == "HA only";'
           then:
             - switch.turn_on: relay_a
@@ -124,7 +124,7 @@ binary_sensor:
         max_length: 400ms
         then:
           - script.execute: a_single
-    # Double click (if your ESPHome build supports on_double_click; if not, we can convert to on_multi_click)
+    # Double click (if your build lacks on_double_click, we can swap to on_multi_click)
     on_double_click:
       - min_length: 50ms
         max_length: 350ms
@@ -136,7 +136,7 @@ binary_sensor:
         - delay: 500ms
         - if:
             condition:
-              lambda: 'return id(btn_a).state;'
+              binary_sensor.is_on: btn_a
             then:
               - script.execute: a_hold_loop
     on_release:
@@ -179,7 +179,7 @@ script:
     then:
       - if:
           condition:
-            lambda: 'return api_connected;'
+            api.connected
           then:
             # Decide current state from HA (if available) else relay
             - lambda: |-
@@ -264,7 +264,7 @@ script:
     then:
       - if:
           condition:
-            lambda: 'return api_connected;'
+            api.connected
           then:
             - if:
                 condition:
@@ -308,7 +308,9 @@ script:
     then:
       - while:
           condition:
-            lambda: 'return id(btn_a).state && api_connected;'
+            and:
+              - binary_sensor.is_on: btn_a
+              - api.connected
           then:
             - if:
                 condition:
