@@ -1,7 +1,7 @@
 substitutions:
   device_model: "Switchman M5 (1-Gang)"
   device_make: "Sonoff"
-  package_version: "3.2.2"
+  package_version: "3.2.3"
 
   # Safe default for HA entity to follow (uses slug/underscores)
   a_follow_entity: "switch.${device_slug}_relay_a"
@@ -26,9 +26,9 @@ esphome:
     priority: -100
     then:
       # Hard reset all LEDs to DARK at boot to avoid any residual glow
-      - output.set_level: { id: panel_pwm,    level: 1.0 }  # 1.0 (pin HIGH) = OFF for active-low panel LED
-      - output.turn_off:  red_led_out
-      - output.turn_off:  blue_status_led
+      - output.set_level: { id: panel_pwm, level: 1.0 }     # 1.0 (pin HIGH) = OFF for active-low panel LED
+      - script.execute: red_off
+      - output.turn_off: blue_status_led
 
       # Ensure power stays fed in Smart only (decoupled) mode
       - if:
@@ -90,12 +90,11 @@ output:
     pin: GPIO18
     frequency: 1000 Hz
 
-  # Red LED (digital) on GPIO19
+  # Red LED (digital) on GPIO19 (polarity handled in scripts)
   - platform: gpio
     id: red_led_out
     pin:
       number: GPIO19
-      inverted: true
 
   # Small blue STATUS LED on GPIO5 (active-low)
   - platform: gpio
@@ -190,6 +189,18 @@ select:
     restore_value: true
     initial_option: ${indicator_led_default}
     entity_category: config
+
+  # Hardware diagnostic: define red LED polarity for your board revision
+  - platform: template
+    id: red_polarity
+    name: "Red LED polarity"
+    options:
+      - Active high
+      - Active low
+    optimistic: true
+    restore_value: true
+    initial_option: "Active high"
+    entity_category: diagnostic
 
 number:
   - platform: template
@@ -303,6 +314,35 @@ button:
   - platform: restart
     name: "Restart"
 
+  # --- Diagnostics (optional) ---
+  - platform: template
+    name: "Diag: Red ON"
+    entity_category: diagnostic
+    on_press:
+      then:
+        - script.execute: red_on
+
+  - platform: template
+    name: "Diag: Red OFF"
+    entity_category: diagnostic
+    on_press:
+      then:
+        - script.execute: red_off
+
+  - platform: template
+    name: "Diag: Blue ON 100%"
+    entity_category: diagnostic
+    on_press:
+      then:
+        - output.set_level: { id: panel_pwm, level: 0.0 }   # active-low = ON
+
+  - platform: template
+    name: "Diag: Blue OFF"
+    entity_category: diagnostic
+    on_press:
+      then:
+        - output.set_level: { id: panel_pwm, level: 1.0 }   # active-low = OFF
+
 script:
   # Compute effective output & drive LEDs with NO mixing and NO residual PWM
   - id: refresh_output
@@ -317,12 +357,12 @@ script:
           else eff = (ha_on || rel_on);
           id(a_output).publish_state(eff);
 
-      # Default: EVERYTHING OFF (prevents purple/mixing)
-      - output.set_level: { id: panel_pwm,   level: 1.0 }   # OFF for active-low panel (pin HIGH)
-      - output.turn_off:  red_led_out
-      - output.turn_off:  blue_status_led
+      # Default: EVERYTHING OFF (prevents mixing and ensures "OFF = dark")
+      - output.set_level: { id: panel_pwm, level: 1.0 }   # OFF for active-low
+      - script.execute: red_off
+      - output.turn_off: blue_status_led
 
-      # Show exactly one indicator if requested
+      # Show exactly one indicator if requested and effective output is ON
       - if:
           condition:
             lambda: 'return id(indicator_led).state == std::string("Blue") && id(a_output).state;'
@@ -335,7 +375,7 @@ script:
           condition:
             lambda: 'return id(indicator_led).state == std::string("Red") && id(a_output).state;'
           then:
-            - output.turn_on: red_led_out
+            - script.execute: red_on
 
       # If no indicator selected, allow status LED ONLY when disconnected
       - if:
@@ -346,6 +386,27 @@ script:
                   api.connected:
           then:
             - output.turn_on: blue_status_led
+
+  # Helpers to abstract red LED polarity
+  - id: red_on
+    then:
+      - if:
+          condition:
+            lambda: 'return id(red_polarity).state == "Active high";'
+          then:
+            - output.turn_on: red_led_out
+          else:
+            - output.turn_off: red_led_out
+
+  - id: red_off
+    then:
+      - if:
+          condition:
+            lambda: 'return id(red_polarity).state == "Active high";'
+          then:
+            - output.turn_off: red_led_out
+          else:
+            - output.turn_on: red_led_out
 
   # Single press
   - id: a_single
