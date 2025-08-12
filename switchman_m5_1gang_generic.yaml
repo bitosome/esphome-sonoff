@@ -5,12 +5,12 @@
 # - Smart + Relay   → both; output = OR(HA, relay)
 #
 # Output entity: "Switch Button A state"
-# Indicator: choose which LED follows the effective output (Blue or Red).
+# Indicator LED select: Blue | Red | None
 #
 # In your mini, set:
 #   device_name: office-light-switch-1
 #   device_friendly_name: Office light switch 1
-#   device_slug: office_light_switch_1   # underscore version for HA entity IDs
+#   device_slug: office_light_switch_1   # underscore for HA entity IDs
 
 substitutions:
   device_name: ""
@@ -44,8 +44,8 @@ substitutions:
   a_hold_step_pct: "0"
 
   default_mode_a: "Relay only"        # Relay only | Smart only | Smart + Relay
-  indicator_led_default: "Blue"        # Blue | Red
-  backlight_brightness_pct: "70"       # Blue LED brightness when ON (0-100)
+  indicator_led_default: "Blue"        # Blue | Red | None
+  backlight_brightness_pct: "70"       # 0–100 (for Blue LED when used as indicator)
 
 esphome:
   name: ${device_name}
@@ -67,7 +67,7 @@ logger:
 # No status_led: we drive LEDs ourselves.
 
 output:
-  # Backlight PWM (panel LED driver → Blue LED)
+  # Backlight PWM (Blue LED)
   - platform: ledc
     id: panel_pwm
     pin: GPIO18
@@ -79,7 +79,7 @@ output:
     pin: GPIO19
 
 light:
-  # Panel backlight (Blue)
+  # Blue LED (panel backlight)
   - platform: monochromatic
     id: panel_backlight
     name: "Blue LED"
@@ -167,13 +167,14 @@ select:
     initial_option: "Latching"
     entity_category: config
 
-  # NEW: which LED reflects the effective output
+  # Which LED reflects the effective output
   - platform: template
     id: indicator_led
     name: "Indicator LED"
     options:
       - Blue
       - Red
+      - None
     optimistic: true
     restore_value: true
     initial_option: ${indicator_led_default}
@@ -292,7 +293,7 @@ button:
     name: "Restart"
 
 script:
-  # Compute effective output, publish it, and set LEDs to match selection
+  # Compute effective output, publish it, and set LEDs according to selection
   - id: refresh_output
     then:
       - lambda: |-
@@ -305,7 +306,6 @@ script:
           else eff = (ha_on || rel_on);
           id(a_output).publish_state(eff);
 
-      # Apply LED policy based on selection
       - if:
           condition:
             lambda: 'return id(indicator_led).state == std::string("Blue");'
@@ -322,14 +322,21 @@ script:
                   - light.turn_off: panel_backlight
                   - light.turn_off: panel_red_led
           else:
-            # Red selected
             - if:
                 condition:
-                  lambda: 'return id(a_output).state;'
+                  lambda: 'return id(indicator_led).state == std::string("Red");'
                 then:
-                  - light.turn_off: panel_backlight
-                  - light.turn_on: panel_red_led
+                  - if:
+                      condition:
+                        lambda: 'return id(a_output).state;'
+                      then:
+                        - light.turn_off: panel_backlight
+                        - light.turn_on: panel_red_led
+                      else:
+                        - light.turn_off: panel_backlight
+                        - light.turn_off: panel_red_led
                 else:
+                  # None selected → no indicator: ensure both OFF
                   - light.turn_off: panel_backlight
                   - light.turn_off: panel_red_led
 
