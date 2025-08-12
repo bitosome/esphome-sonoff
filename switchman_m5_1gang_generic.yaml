@@ -1,12 +1,12 @@
 substitutions:
   device_model: "Switchman M5 (1-Gang)"
   device_make: "Sonoff"
-  package_version: "3.1.3"
+  package_version: "3.2.0"
 
   # Safe default for HA entity to follow (uses slug/underscores)
   a_follow_entity: "switch.${device_slug}_relay_a"
 
-  # Blue backlight brightness when it's supposed to be ON (0–100)
+  # Panel backlight (blue ring) brightness when ON (0–100)
   backlight_brightness_pct: "70"
 
   # Which LED reflects the effective output by default
@@ -25,11 +25,11 @@ esphome:
   on_boot:
     priority: -100
     then:
-      # Force both LEDs fully OFF at boot to avoid residual glow
-      - output.set_level:
-          id: panel_pwm
-          level: 1.0      # 1.0 => pin HIGH => blue off on active-low hardware
-      - output.turn_off: red_led_out
+      # Hard reset all LEDs to DARK at boot to avoid any residual glow
+      - output.set_level: { id: panel_pwm,    level: 1.0 }  # 1.0 (pin HIGH) = OFF for active-low panel LED
+      - output.turn_off:  red_led_out
+      - output.turn_off:  blue_status_led
+
       # Ensure power stays fed in Smart only (decoupled) mode
       - if:
           condition:
@@ -38,6 +38,7 @@ esphome:
               - lambda: 'return id(mode_a).state == "Smart only";'
           then:
             - switch.turn_on: relay_a
+
       - script.execute: refresh_output
 
 logger:
@@ -66,6 +67,21 @@ api:
     key: ${api_key}
   reboot_timeout: 0s
 
+  # Keep status LED off when connected; allow it only when disconnected AND no indicator is selected.
+  on_client_connected:
+    then:
+      - output.turn_off: blue_status_led
+      - script.execute: refresh_output
+  on_client_disconnected:
+    then:
+      - if:
+          condition:
+            lambda: 'return id(indicator_led).state == std::string("None");'
+          then:
+            - output.turn_on: blue_status_led
+          else:
+            - output.turn_off: blue_status_led
+
 ota:
   - platform: esphome
     password: ${ota_password}
@@ -75,18 +91,27 @@ captive_portal:
 web_server:
   port: 80
 
-# We drive LEDs with raw outputs (no light entities to avoid restore/transition quirks).
+# We drive LEDs with raw outputs (no HA light entities -> no restore/transition side-effects).
 output:
-  # Blue backlight (active-low on M5). Do NOT invert; we compute levels explicitly.
+  # Panel backlight (Blue ring) on GPIO18. Active-low on M5: OFF = pin HIGH.
   - platform: ledc
     id: panel_pwm
     pin: GPIO18
     frequency: 1000 Hz
 
-  # Red LED (active-high digital)
+  # Red LED (digital) on GPIO19
   - platform: gpio
     id: red_led_out
-    pin: GPIO19
+    pin:
+      number: GPIO19
+
+  # Small blue STATUS LED on GPIO5 (active-low)
+  - platform: gpio
+    id: blue_status_led
+    pin:
+      number: GPIO5
+      inverted: true
+      ignore_strapping_warning: true
 
 switch:
   # Physical relay
@@ -287,7 +312,7 @@ button:
     name: "Restart"
 
 script:
-  # Publish effective output & drive LEDs
+  # Compute effective output & drive LEDs with NO mixing and NO residual PWM
   - id: refresh_output
     then:
       - lambda: |-
@@ -300,50 +325,34 @@ script:
           else eff = (ha_on || rel_on);
           id(a_output).publish_state(eff);
 
-      # Blue LED control via raw PWM; Red via digital output.
-      # OFF is enforced as: panel_pwm level = 1.0 (pin HIGH on active-low => dark), red off.
+      # Default: EVERYTHING OFF (prevents purple/mixing)
+      - output.set_level: { id: panel_pwm,   level: 1.0 }   # OFF for active-low panel (pin HIGH)
+      - output.turn_off:  red_led_out
+      - output.turn_off:  blue_status_led
+
+      # Show exactly one indicator if requested
       - if:
           condition:
-            lambda: 'return id(indicator_led).state == std::string("Blue");'
+            lambda: 'return id(indicator_led).state == std::string("Blue") && id(a_output).state;'
           then:
-            - if:
-                condition:
-                  lambda: 'return id(a_output).state;'
-                then:
-                  # Blue ON at requested brightness (active-low => 1.0 - pct)
-                  - output.set_level:
-                      id: panel_pwm
-                      level: !lambda 'return 1.0f - (${backlight_brightness_pct} / 100.0f);'
-                  - output.turn_off: red_led_out
-                else:
-                  - output.set_level:
-                      id: panel_pwm
-                      level: 1.0
-                  - output.turn_off: red_led_out
-          else:
-            - if:
-                condition:
-                  lambda: 'return id(indicator_led).state == std::string("Red");'
-                then:
-                  - if:
-                      condition:
-                        lambda: 'return id(a_output).state;'
-                      then:
-                        - output.set_level:
-                            id: panel_pwm
-                            level: 1.0
-                        - output.turn_on: red_led_out
-                      else:
-                        - output.set_level:
-                            id: panel_pwm
-                            level: 1.0
-                        - output.turn_off: red_led_out
-                else:
-                  # None selected → both OFF, enforce dark
-                  - output.set_level:
-                      id: panel_pwm
-                      level: 1.0
-                  - output.turn_off: red_led_out
+            - output.set_level:
+                id: panel_pwm
+                level: !lambda 'return (1.0f - (${backlight_brightness_pct} / 100.0f));'  # ON for active-low
+      - if:
+          condition:
+            lambda: 'return id(indicator_led).state == std::string("Red") && id(a_output).state;'
+          then:
+            - output.turn_on: red_led_out
+
+      # If no indicator is selected, allow status LED ONLY when disconnected
+      - if:
+          condition:
+            and:
+              - lambda: 'return id(indicator_led).state == std::string("None");'
+              - not:
+                  condition: api.connected
+          then:
+            - output.turn_on: blue_status_led
 
   # Single press
   - id: a_single
