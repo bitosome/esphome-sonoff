@@ -433,6 +433,7 @@ binary_sensor:
     name: "API Status"
     id: sensor_status
     disabled_by_default: true
+    entity_category: diagnostic
 
   # EXACTLY like your original:
   # - When API connected -> turn OFF blue LED (no blink)
@@ -452,13 +453,13 @@ binary_sensor:
   # Momentary event pulse for visibility in HA when a physical/simulated double click occurs
   - platform: template
     id: a_double_event
-    name: "Button A double click (event)"
+    name: "Button A double click event"
     entity_category: diagnostic
 
   # Shows when a hold is currently active
   - platform: template
     id: a_hold_active
-    name: "Button A holding"
+    name: "Button A hold event"
     entity_category: diagnostic
 
 sensor:
@@ -592,11 +593,6 @@ button:
     id: button_a_hold_action
     on_press:
       - script.execute: a_hold_burst
-
-  - platform: factory_reset
-    name: "Load Factory Settings"
-    id: factory_reset_all
-    icon: mdi:factory
 
   - platform: restart
     name: "Reboot Device"
