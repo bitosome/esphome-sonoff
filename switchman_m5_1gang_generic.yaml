@@ -1,44 +1,25 @@
 substitutions:
   device_model: "Switchman M5 (1-Gang)"
   device_make: "Sonoff"
-  package_version: "3.2.3"
+  package_version: "3.4.1"
 
-  # Safe default for HA entity to follow (uses slug/underscores)
-  a_follow_entity: "switch.${device_slug}_relay_a"
-
-  # Panel backlight (blue ring) brightness when ON (0–100)
-  backlight_brightness_pct: "70"
-
-  # Which LED reflects the effective output by default
-  indicator_led_default: "Red"        # Blue | Red | None
-
-  # Mode default
-  default_mode_a: "Smart + Relay"     # Relay only | Smart only | Smart + Relay
-
+  # Defaults (override in mini as needed)
+  indicator_led_default: "Red"            # Red | None
+  backlight_brightness_pct: "70"          # 0–100
   log_level: INFO
   timezone: "Europe/Tallinn"
 
 esphome:
   name: ${device_name}
   friendly_name: ${device_friendly_name}
-  comment: "${device_model} by ${device_make} version ${package_version}"
+  comment: "${device_model} by ${device_make} v${package_version}"
   on_boot:
     priority: -100
     then:
-      # Hard reset all LEDs to DARK at boot to avoid any residual glow
-      - output.set_level: { id: panel_pwm, level: 1.0 }     # 1.0 (pin HIGH) = OFF for active-low panel LED
-      - script.execute: red_off
-      - output.turn_off: blue_status_led
-
-      # Ensure power stays fed in Smart only (decoupled) mode
-      - if:
-          condition:
-            and:
-              - api.connected
-              - lambda: 'return id(mode_a).state == "Smart only";'
-          then:
-            - switch.turn_on: relay_a
-
+      - lambda: 'id(cpu_speed) = ESP.getCpuFreqMHz();'
+      - light.turn_on: blue_status
+      - light.turn_off: red_backlight
+      - switch.turn_off: red_led
       - script.execute: refresh_output
 
 logger:
@@ -82,34 +63,39 @@ captive_portal:
 web_server:
   port: 80
 
-# We drive LEDs with raw outputs (no HA light entities -> no restore/transition side-effects).
+# -------------------- IO (Sonoff M5 1-gang) --------------------
+# GPIO00: Button 1 | GPIO23: Relay 1 | GPIO19: LED1 (red) | GPIO05: Status (blue, inverted) | GPIO18: PWM red backlight
 output:
-  # Panel backlight (Blue ring) on GPIO18. Active-low on M5: OFF = pin HIGH.
   - platform: ledc
-    id: panel_pwm
+    id: red_pwm
     pin: GPIO18
     frequency: 1000 Hz
 
-  # Red LED (digital) on GPIO19 (polarity handled in scripts)
-  - platform: gpio
-    id: red_led_out
-    pin:
-      number: GPIO19
-
-  # Small blue STATUS LED on GPIO5 (active-low)
-  - platform: gpio
-    id: blue_status_led
+light:
+  - platform: status_led
+    id: blue_status
+    name: "Blue Status LED"
     pin:
       number: GPIO5
       inverted: true
       ignore_strapping_warning: true
+    internal: true
+    restore_mode: ALWAYS_OFF
+
+  - platform: monochromatic
+    id: red_backlight
+    name: "Red Backlight (PWM)"
+    output: red_pwm
+    icon: "mdi:led-outline"
+    entity_category: config
+    restore_mode: RESTORE_DEFAULT_OFF
 
 switch:
-  # Physical relay
   - platform: gpio
     id: relay_a
     name: "Relay A"
     pin: GPIO23
+    restore_mode: RESTORE_DEFAULT_OFF
     on_turn_on:
       then:
         - script.execute: refresh_output
@@ -133,13 +119,21 @@ switch:
       then:
         - script.execute: refresh_output
 
-  # Effective output exposed to HA
+  - platform: gpio
+    id: red_led
+    name: "Red LED (indicator)"
+    pin: GPIO19
+    restore_mode: RESTORE_DEFAULT_OFF
+
   - platform: template
     id: a_output
     name: "Switch Button A state"
     icon: mdi:light-switch
     lambda: |-
-      bool ha_on = (id(a_state).has_state() && id(a_state).state == "on");
+      // Decide where to read "HA on": self (relay) vs HA entity
+      bool use_self = std::string("${a_follow_mode}") == "self";
+      bool ha_on = use_self ? id(relay_a).state
+                            : (id(a_state).has_state() && id(a_state).state == "on");
       bool rel_on = id(relay_a).state;
       std::string m = id(mode_a).state;
       if (m == "Relay only") return rel_on;
@@ -156,10 +150,7 @@ select:
   - platform: template
     id: mode_a
     name: "Mode A"
-    options:
-      - Relay only
-      - Smart only
-      - Smart + Relay
+    options: [Relay only, Smart only, Smart + Relay]
     optimistic: true
     restore_value: true
     initial_option: ${default_mode_a}
@@ -168,39 +159,20 @@ select:
   - platform: template
     id: behavior_a
     name: "Relay A behavior"
-    options:
-      - Latching
-      - Momentary 200ms
-      - Inching
+    options: [Latching, Momentary 200ms, Inching]
     optimistic: true
     restore_value: true
     initial_option: "Latching"
     entity_category: config
 
-  # Which LED reflects the effective output
   - platform: template
     id: indicator_led
     name: "Indicator LED"
-    options:
-      - Blue
-      - Red
-      - None
+    options: [Red, None]
     optimistic: true
     restore_value: true
     initial_option: ${indicator_led_default}
     entity_category: config
-
-  # Hardware diagnostic: define red LED polarity for your board revision
-  - platform: template
-    id: red_polarity
-    name: "Red LED polarity"
-    options:
-      - Active high
-      - Active low
-    optimistic: true
-    restore_value: true
-    initial_option: "Active high"
-    entity_category: diagnostic
 
 number:
   - platform: template
@@ -215,13 +187,13 @@ number:
     entity_category: config
 
 binary_sensor:
-  # Physical button
   - platform: gpio
     id: btn_a
     pin:
       number: GPIO0
       mode: INPUT_PULLUP
       inverted: true
+      ignore_strapping_warning: true
     internal: true
     filters:
       - delayed_on_off: 30ms
@@ -248,19 +220,104 @@ binary_sensor:
         - script.stop: a_hold_loop
 
   - platform: status
-    name: "Status"
+    name: "API Status"
+    id: sensor_status
+    disabled_by_default: true
+
+  - platform: template
+    id: api_connected
+    name: "API connected"
+    internal: true
+    device_class: connectivity
+    lambda: return global_api_server->is_connected();
+    on_press:
+      - light.turn_off: blue_status
+    on_release:
+      - light.turn_on: blue_status
 
 sensor:
   - platform: wifi_signal
-    name: "WiFi RSSI"
+    name: "RSSI"
+    id: sensor_rssi
     update_interval: 60s
+    entity_category: diagnostic
 
   - platform: uptime
-    name: "Uptime"
+    name: "Uptime (raw seconds)"
+    id: sensor_uptime
     update_interval: 60s
+    entity_category: diagnostic
+    internal: true
+    on_raw_value:
+      then:
+        - text_sensor.template.publish:
+            id: uptime_human
+            state: !lambda |-
+              int seconds = round(id(sensor_uptime).raw_state);
+              int days = seconds / (24 * 3600);
+              seconds = seconds % (24 * 3600);
+              int hours = seconds / 3600;
+              seconds = seconds % 3600;
+              int minutes = seconds / 60;
+              seconds = seconds % 60;
+              return (
+                (days ? String(days) + "d " : "") +
+                (hours ? String(hours) + "h " : "") +
+                (minutes ? String(minutes) + "m " : "") +
+                (String(seconds) + "s")
+              ).c_str();
+
+  - platform: template
+    id: esp_memory
+    icon: mdi:memory
+    name: "Free Memory"
+    lambda: return heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024;
+    unit_of_measurement: "kB"
+    state_class: measurement
+    entity_category: diagnostic
+    disabled_by_default: true
+
+  - platform: internal_temperature
+    name: "Internal Temperature"
+    disabled_by_default: true
+    icon: mdi:heat-wave
+    entity_category: diagnostic
+
+  - platform: template
+    name: "CPU Frequency"
+    icon: "mdi:speedometer"
+    accuracy_decimals: 0
+    unit_of_measurement: "MHz"
+    disabled_by_default: true
+    lambda: |-
+      return (id(cpu_speed));
+    entity_category: diagnostic
 
 text_sensor:
-  # Follow HA entity (safe slug)
+  - platform: template
+    name: "Uptime"
+    id: uptime_human
+    icon: "mdi:timer-check-outline"
+    update_interval: 60s
+    entity_category: diagnostic
+    disabled_by_default: true
+
+  - platform: version
+    name: "ESPHome Version"
+
+  - platform: wifi_info
+    ip_address:
+      id: ip_address
+      name: "IP Address"
+      icon: "mdi:wan"
+    ssid:
+      name: "SSID"
+    bssid:
+      name: "BSSID"
+    mac_address:
+      name: "MAC"
+
+  # Only used when a_follow_mode == "ha". If left blank or invalid, it just won't update.
   - platform: homeassistant
     id: a_state
     internal: true
@@ -275,32 +332,39 @@ text_sensor:
                   id(a_output_state) = (id(a_state).state == "on");
         - script.execute: refresh_output
 
-  - platform: version
-    name: "ESPHome Version"
-
-  - platform: wifi_info
-    ip_address:
-      name: "IP"
-    ssid:
-      name: "SSID"
-    bssid:
-      name: "BSSID"
-    mac_address:
-      name: "MAC"
-
 globals:
   - id: a_last_known_on
     type: bool
     restore_value: no
     initial_value: 'false'
 
-  # Optimistic state used in Smart only (decoupled) mode
   - id: a_output_state
     type: bool
     restore_value: no
     initial_value: 'false'
 
+  - id: cpu_speed
+    type: int
+    restore_value: no
+    initial_value: "0"
+
 button:
+  - platform: template
+    name: "Button A double click action"
+    id: button_a_double_click_action
+    on_press:
+      - homeassistant.event:
+          event: esphome.switchman_m5
+          data: { button: A, action: double_click }
+
+  - platform: template
+    name: "Button A hold action"
+    id: button_a_hold_action
+    on_press:
+      - homeassistant.event:
+          event: esphome.switchman_m5
+          data: { button: A, action: hold }
+
   - platform: template
     name: "Simulate Double Click"
     on_press:
@@ -311,44 +375,24 @@ button:
     on_press:
       - script.execute: a_hold_burst
 
+  - platform: factory_reset
+    name: "Load Factory Settings"
+    id: factory_reset_all
+    icon: mdi:factory
+
   - platform: restart
-    name: "Restart"
-
-  # --- Diagnostics (optional) ---
-  - platform: template
-    name: "Diag: Red ON"
+    name: "Reboot Device"
+    id: button_restart
+    icon: mdi:power-cycle
     entity_category: diagnostic
-    on_press:
-      then:
-        - script.execute: red_on
-
-  - platform: template
-    name: "Diag: Red OFF"
-    entity_category: diagnostic
-    on_press:
-      then:
-        - script.execute: red_off
-
-  - platform: template
-    name: "Diag: Blue ON 100%"
-    entity_category: diagnostic
-    on_press:
-      then:
-        - output.set_level: { id: panel_pwm, level: 0.0 }   # active-low = ON
-
-  - platform: template
-    name: "Diag: Blue OFF"
-    entity_category: diagnostic
-    on_press:
-      then:
-        - output.set_level: { id: panel_pwm, level: 1.0 }   # active-low = OFF
 
 script:
-  # Compute effective output & drive LEDs with NO mixing and NO residual PWM
   - id: refresh_output
     then:
       - lambda: |-
-          bool ha_on = (id(a_state).has_state() && id(a_state).state == "on");
+          bool use_self = std::string("${a_follow_mode}") == "self";
+          bool ha_on = use_self ? id(relay_a).state
+                                : (id(a_state).has_state() && id(a_state).state == "on");
           bool rel_on = id(relay_a).state;
           std::string m = id(mode_a).state;
           bool eff = false;
@@ -357,65 +401,32 @@ script:
           else eff = (ha_on || rel_on);
           id(a_output).publish_state(eff);
 
-      # Default: EVERYTHING OFF (prevents mixing and ensures "OFF = dark")
-      - output.set_level: { id: panel_pwm, level: 1.0 }   # OFF for active-low
-      - script.execute: red_off
-      - output.turn_off: blue_status_led
-
-      # Show exactly one indicator if requested and effective output is ON
-      - if:
-          condition:
-            lambda: 'return id(indicator_led).state == std::string("Blue") && id(a_output).state;'
-          then:
-            - output.set_level:
-                id: panel_pwm
-                level: !lambda 'return (1.0f - (${backlight_brightness_pct} / 100.0f));'  # ON for active-low
+      - light.turn_off: red_backlight
+      - switch.turn_off: red_led
 
       - if:
           condition:
-            lambda: 'return id(indicator_led).state == std::string("Red") && id(a_output).state;'
+            lambda: 'return id(a_output).state && id(indicator_led).state == std::string("Red");'
           then:
-            - script.execute: red_on
+            - switch.turn_on: red_led
 
-      # If no indicator selected, allow status LED ONLY when disconnected
       - if:
           condition:
-            and:
-              - lambda: 'return id(indicator_led).state == std::string("None");'
-              - not:
-                  api.connected:
+            lambda: 'return !id(a_output).state && ${backlight_brightness_pct} > 0;'
           then:
-            - output.turn_on: blue_status_led
+            - light.turn_on:
+                id: red_backlight
+                brightness: !lambda 'return ${backlight_brightness_pct} / 100.0f;'
 
-  # Helpers to abstract red LED polarity
-  - id: red_on
-    then:
-      - if:
-          condition:
-            lambda: 'return id(red_polarity).state == "Active high";'
-          then:
-            - output.turn_on: red_led_out
-          else:
-            - output.turn_off: red_led_out
-
-  - id: red_off
-    then:
-      - if:
-          condition:
-            lambda: 'return id(red_polarity).state == "Active high";'
-          then:
-            - output.turn_off: red_led_out
-          else:
-            - output.turn_on: red_led_out
-
-  # Single press
   - id: a_single
     then:
       - if:
           condition: api.connected
           then:
             - lambda: |-
-                bool ha_on = (id(a_state).has_state() && id(a_state).state == "on");
+                bool use_self = std::string("${a_follow_mode}") == "self";
+                bool ha_on = use_self ? id(relay_a).state
+                                      : (id(a_state).has_state() && id(a_state).state == "on");
                 bool rel_on = id(relay_a).state;
                 std::string m = id(mode_a).state;
                 bool eff = false;
@@ -423,7 +434,7 @@ script:
                 else if (m == "Smart only") eff = id(a_output_state);
                 else eff = (ha_on || rel_on);
                 id(a_last_known_on) = !eff;
-            # OFF path
+
             - if:
                 condition:
                   lambda: 'return !id(a_last_known_on);'
@@ -439,14 +450,16 @@ script:
                       then:
                         - homeassistant.service:
                             service: ${a_off_service}
-                            data:
-                              entity_id: ${a_off_entity}
+                            data: { entity_id: ${a_off_entity} }
                   - if:
                       condition:
                         lambda: 'return id(mode_a).state == "Smart only";'
                       then:
                         - lambda: 'id(a_output_state) = false;'
-            # ON path
+                  - homeassistant.event:
+                      event: esphome.switchman_m5
+                      data: { button: A, action: switch_off }
+
             - if:
                 condition:
                   lambda: 'return id(a_last_known_on);'
@@ -460,52 +473,20 @@ script:
                       condition:
                         lambda: 'return strlen("${a_on_entity}") > 0;'
                       then:
-                        - if:
-                            condition:
-                              lambda: 'return ${a_on_kelvin} != 0 && ${a_on_brightness_pct} != 0;'
-                            then:
-                              - homeassistant.service:
-                                  service: ${a_on_service}
-                                  data:
-                                    entity_id: ${a_on_entity}
-                                    kelvin: !lambda 'return ${a_on_kelvin};'
-                                    brightness_pct: !lambda 'return ${a_on_brightness_pct};'
-                        - if:
-                            condition:
-                              lambda: 'return ${a_on_kelvin} != 0 && ${a_on_brightness_pct} == 0;'
-                            then:
-                              - homeassistant.service:
-                                  service: ${a_on_service}
-                                  data:
-                                    entity_id: ${a_on_entity}
-                                    kelvin: !lambda 'return ${a_on_kelvin};'
-                        - if:
-                            condition:
-                              lambda: 'return ${a_on_kelvin} == 0 && ${a_on_brightness_pct} != 0;'
-                            then:
-                              - homeassistant.service:
-                                  service: ${a_on_service}
-                                  data:
-                                    entity_id: ${a_on_entity}
-                                    brightness_pct: !lambda 'return ${a_on_brightness_pct};'
-                        - if:
-                            condition:
-                              lambda: 'return ${a_on_kelvin} == 0 && ${a_on_brightness_pct} == 0;'
-                            then:
-                              - homeassistant.service:
-                                  service: ${a_on_service}
-                                  data:
-                                    entity_id: ${a_on_entity}
+                        - homeassistant.service:
+                            service: ${a_on_service}
+                            data: { entity_id: ${a_on_entity} }
                   - if:
                       condition:
                         lambda: 'return id(mode_a).state == "Smart only";'
                       then:
                         - lambda: 'id(a_output_state) = true;'
+                  - homeassistant.event:
+                      event: esphome.switchman_m5
+                      data: { button: A, action: switch_on }
+
             - script.execute: refresh_output
           else:
-            # OFFLINE behavior:
-            # - Smart only: toggle virtual state only (never touch relay)
-            # - Others: fall back to local relay control
             - if:
                 condition:
                   lambda: 'return id(mode_a).state == "Smart only";'
@@ -515,7 +496,6 @@ script:
                   - switch.toggle: relay_a
             - script.execute: refresh_output
 
-  # Double click
   - id: a_double
     then:
       - if:
@@ -525,45 +505,12 @@ script:
                 condition:
                   lambda: 'return strlen("${a_double_entity}") > 0;'
                 then:
-                  - if:
-                      condition:
-                        lambda: 'return ${a_double_step_pct} != 0;'
-                      then:
-                        - homeassistant.service:
-                            service: ${a_double_service}
-                            data:
-                              entity_id: ${a_double_entity}
-                              brightness_step_pct: !lambda 'return ${a_double_step_pct};'
-                      else:
-                        - homeassistant.service:
-                            service: ${a_double_service}
-                            data:
-                              entity_id: ${a_double_entity}
-            - if:
-                condition:
-                  lambda: 'return strlen("${a_double_entity2}") > 0;'
-                then:
                   - homeassistant.service:
-                      service: ${a_double_service2}
-                      data:
-                        entity_id: ${a_double_entity2}
-            - if:
-                condition:
-                  lambda: 'return strlen("${a_double_entity3}") > 0;'
-                then:
-                  - homeassistant.service:
-                      service: ${a_double_service3}
-                      data:
-                        entity_id: ${a_double_entity3}
-          else:
-            - if:
-                condition:
-                  lambda: 'return id(mode_a).state != "Smart only";'
-                then:
-                  - switch.toggle: relay_a
+                      service: ${a_double_service}
+                      data: { entity_id: ${a_double_entity} }
+      - button.press: button_a_double_click_action
       - script.execute: refresh_output
 
-  # Hold primitives (no relay touches here)
   - id: a_hold_tick
     then:
       - if:
@@ -573,36 +520,10 @@ script:
                 condition:
                   lambda: 'return strlen("${a_hold_entity}") > 0;'
                 then:
-                  - if:
-                      condition:
-                        lambda: 'return ${a_hold_step_pct} != 0;'
-                      then:
-                        - homeassistant.service:
-                            service: ${a_hold_service}
-                            data:
-                              entity_id: ${a_hold_entity}
-                              brightness_step_pct: !lambda 'return ${a_hold_step_pct};'
-                      else:
-                        - homeassistant.service:
-                            service: ${a_hold_service}
-                            data:
-                              entity_id: ${a_hold_entity}
-            - if:
-                condition:
-                  lambda: 'return strlen("${a_hold_entity2}") > 0;'
-                then:
                   - homeassistant.service:
-                      service: ${a_hold_service2}
-                      data:
-                        entity_id: ${a_hold_entity2}
-            - if:
-                condition:
-                  lambda: 'return strlen("${a_hold_entity3}") > 0;'
-                then:
-                  - homeassistant.service:
-                      service: ${a_hold_service3}
-                      data:
-                        entity_id: ${a_hold_entity3}
+                      service: ${a_hold_service}
+                      data: { entity_id: ${a_hold_entity} }
+      - button.press: button_a_hold_action
       - script.execute: refresh_output
 
   - id: a_hold_loop
@@ -624,7 +545,6 @@ script:
             - script.execute: a_hold_tick
             - delay: 150ms
 
-  # Direct actions used by the Output switch
   - id: a_do_off
     then:
       - if:
@@ -638,13 +558,15 @@ script:
           then:
             - homeassistant.service:
                 service: ${a_off_service}
-                data:
-                  entity_id: ${a_off_entity}
+                data: { entity_id: ${a_off_entity} }
       - if:
           condition:
             lambda: 'return id(mode_a).state == "Smart only";'
           then:
             - lambda: 'id(a_output_state) = false;'
+      - homeassistant.event:
+          event: esphome.switchman_m5
+          data: { button: A, action: switch_off }
       - script.execute: refresh_output
 
   - id: a_do_on
@@ -658,45 +580,15 @@ script:
           condition:
             lambda: 'return strlen("${a_on_entity}") > 0;'
           then:
-            - if:
-                condition:
-                  lambda: 'return ${a_on_kelvin} != 0 && ${a_on_brightness_pct} != 0;'
-                then:
-                  - homeassistant.service:
-                      service: ${a_on_service}
-                      data:
-                        entity_id: ${a_on_entity}
-                        kelvin: !lambda 'return ${a_on_kelvin};'
-                        brightness_pct: !lambda 'return ${a_on_brightness_pct};'
-            - if:
-                condition:
-                  lambda: 'return ${a_on_kelvin} != 0 && ${a_on_brightness_pct} == 0;'
-                then:
-                  - homeassistant.service:
-                      service: ${a_on_service}
-                      data:
-                        entity_id: ${a_on_entity}
-                        kelvin: !lambda 'return ${a_on_kelvin};'
-            - if:
-                condition:
-                  lambda: 'return ${a_on_kelvin} == 0 && ${a_on_brightness_pct} != 0;'
-                then:
-                  - homeassistant.service:
-                      service: ${a_on_service}
-                      data:
-                        entity_id: ${a_on_entity}
-                        brightness_pct: !lambda 'return ${a_on_brightness_pct};'
-            - if:
-                condition:
-                  lambda: 'return ${a_on_kelvin} == 0 && ${a_on_brightness_pct} == 0;'
-                then:
-                  - homeassistant.service:
-                      service: ${a_on_service}
-                      data:
-                        entity_id: ${a_on_entity}
+            - homeassistant.service:
+                service: ${a_on_service}
+                data: { entity_id: ${a_on_entity} }
       - if:
           condition:
             lambda: 'return id(mode_a).state == "Smart only";'
           then:
             - lambda: 'id(a_output_state) = true;'
+      - homeassistant.event:
+          event: esphome.switchman_m5
+          data: { button: A, action: switch_on }
       - script.execute: refresh_output
