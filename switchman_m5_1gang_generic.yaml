@@ -1,7 +1,7 @@
 substitutions:
   device_model: "Switchman M5 (1-Gang)"
   device_make: "Sonoff"
-  package_version: "3.5.1"
+  package_version: "3.6.0"
 
   log_level: INFO
   timezone: "Europe/Tallinn"
@@ -73,13 +73,13 @@ script:
           bool rel_on = id(relay_a).state;
           std::string m = id(mode_a).state;
           bool eff = false;
-          if (m == "Relay only") eff = rel_on;
-          else if (m == "Smart only") eff = id(a_output_state);
-          else eff = (ha_on || rel_on);
+          // Decoupled -> virtual smart state only; Coupled -> relay OR followed HA entity
+          if (m == "Decoupled") eff = id(a_output_state);
+          else                   eff = (ha_on || rel_on);
           id(a_output).publish_state(eff);
 
       # Front indicator policy for 1-gang:
-      # - Red ON when "Switch Button A state" is ON
+      # - Red ON when "Button A state" (effective) is ON
       # - Otherwise ALL front LEDs OFF
       - if:
           condition:
@@ -102,9 +102,8 @@ script:
                 bool rel_on = id(relay_a).state;
                 std::string m = id(mode_a).state;
                 bool eff = false;
-                if (m == "Relay only") eff = rel_on;
-                else if (m == "Smart only") eff = id(a_output_state);
-                else eff = (ha_on || rel_on);
+                if (m == "Decoupled") eff = id(a_output_state);
+                else                   eff = (ha_on || rel_on);
                 id(a_last_known_on) = !eff;
 
             # OFF path
@@ -114,7 +113,7 @@ script:
                 then:
                   - if:
                       condition:
-                        lambda: 'return id(mode_a).state != "Smart only";'
+                        lambda: 'return id(mode_a).state != "Decoupled";'
                       then:
                         - switch.turn_off: relay_a
                   - if:
@@ -127,7 +126,7 @@ script:
                               entity_id: ${a_off_entity}
                   - if:
                       condition:
-                        lambda: 'return id(mode_a).state == "Smart only";'
+                        lambda: 'return id(mode_a).state == "Decoupled";'
                       then:
                         - lambda: 'id(a_output_state) = false;'
                   - homeassistant.event:
@@ -143,7 +142,7 @@ script:
                 then:
                   - if:
                       condition:
-                        lambda: 'return id(mode_a).state != "Smart only";'
+                        lambda: 'return id(mode_a).state != "Decoupled";'
                       then:
                         - switch.turn_on: relay_a
                   - if:
@@ -156,7 +155,7 @@ script:
                               entity_id: ${a_on_entity}
                   - if:
                       condition:
-                        lambda: 'return id(mode_a).state == "Smart only";'
+                        lambda: 'return id(mode_a).state == "Decoupled";'
                       then:
                         - lambda: 'id(a_output_state) = true;'
                   - homeassistant.event:
@@ -170,7 +169,7 @@ script:
             # Offline behavior
             - if:
                 condition:
-                  lambda: 'return id(mode_a).state == "Smart only";'
+                  lambda: 'return id(mode_a).state == "Decoupled";'
                 then:
                   - lambda: 'id(a_output_state) = !id(a_output_state);'
                 else:
@@ -228,7 +227,7 @@ script:
     then:
       - if:
           condition:
-            lambda: 'return id(mode_a).state != "Smart only";'
+            lambda: 'return id(mode_a).state != "Decoupled";'
           then:
             - switch.turn_off: relay_a
       - if:
@@ -241,7 +240,7 @@ script:
                   entity_id: ${a_off_entity}
       - if:
           condition:
-            lambda: 'return id(mode_a).state == "Smart only";'
+            lambda: 'return id(mode_a).state == "Decoupled";'
           then:
             - lambda: 'id(a_output_state) = false;'
       - homeassistant.event:
@@ -255,7 +254,7 @@ script:
     then:
       - if:
           condition:
-            lambda: 'return id(mode_a).state != "Smart only";'
+            lambda: 'return id(mode_a).state != "Decoupled";'
           then:
             - switch.turn_on: relay_a
       - if:
@@ -268,7 +267,7 @@ script:
                   entity_id: ${a_on_entity}
       - if:
           condition:
-            lambda: 'return id(mode_a).state == "Smart only";'
+            lambda: 'return id(mode_a).state == "Decoupled";'
           then:
             - lambda: 'id(a_output_state) = true;'
       - homeassistant.event:
@@ -306,7 +305,7 @@ switch:
         - script.execute: refresh_output
         - if:
             condition:
-              lambda: 'return id(mode_a).state != "Smart only";'
+              lambda: 'return id(mode_a).state != "Decoupled";'
             then:
               - if:
                   condition:
@@ -327,7 +326,7 @@ switch:
   # Effective output exposed to HA (button/“smart” state)
   - platform: template
     id: a_output
-    name: "Switch Button A state"
+    name: "Button A state"
     icon: mdi:light-switch
     lambda: |-
       bool use_self = std::string("${a_follow_mode}") == "self";
@@ -335,8 +334,7 @@ switch:
                             : (id(a_state).has_state() && id(a_state).state == "on");
       bool rel_on = id(relay_a).state;
       std::string m = id(mode_a).state;
-      if (m == "Relay only") return rel_on;
-      if (m == "Smart only") return id(a_output_state);
+      if (m == "Decoupled") return id(a_output_state);
       return (ha_on || rel_on);
     turn_on_action:
       - script.execute: a_do_on
@@ -349,11 +347,10 @@ switch:
 select:
   - platform: template
     id: mode_a
-    name: "Mode A"
+    name: "Mode - Button A"
     options:
-      - Relay only
-      - Smart only
-      - Smart + Relay
+      - Coupled
+      - Decoupled
     optimistic: true
     restore_value: true
     initial_option: ${default_mode_a}
@@ -525,7 +522,7 @@ text_sensor:
       then:
         - if:
             condition:
-              lambda: 'return id(mode_a).state == "Smart only";'
+              lambda: 'return id(mode_a).state == "Decoupled";'
             then:
               - lambda: |-
                   id(a_output_state) = (id(a_state).state == "on");
