@@ -1,7 +1,7 @@
 substitutions:
   device_model: "Switchman M5 (1-Gang)"
   device_make: "Sonoff"
-  package_version: "3.6.0"
+  package_version: "3.8.0"
 
   log_level: INFO
   timezone: "Europe/Tallinn"
@@ -14,8 +14,8 @@ esphome:
     priority: -100
     then:
       - lambda: 'id(cpu_speed) = ESP.getCpuFreqMHz();'
-      - light.turn_on: blue_status           # blink until API connects
-      - output.turn_off: red_led_out         # front LED dark at boot
+      - light.turn_on: blue          # blink until API connects (turned OFF once connected)
+      - switch.turn_off: red     # front red LED dark at boot
       - script.execute: refresh_output
 
 logger:
@@ -63,7 +63,7 @@ web_server:
 # SCRIPTS (early so all IDs exist before use)
 # ----------------------------------------------------------------
 script:
-  # Compute effective output & drive front LEDs (no backlight, no mixing)
+  # Compute effective output (LED control happens on switch state callbacks)
   - id: refresh_output
     then:
       - lambda: |-
@@ -78,18 +78,7 @@ script:
           else                   eff = (ha_on || rel_on);
           id(a_output).publish_state(eff);
 
-      # Front indicator policy for 1-gang:
-      # - Red ON when "Button A state" (effective) is ON
-      # - Otherwise ALL front LEDs OFF
-      - if:
-          condition:
-            lambda: 'return id(a_output).state;'
-          then:
-            - output.turn_on: red_led_out
-          else:
-            - output.turn_off: red_led_out
-
-  # Single press / toggle logic
+  # Single click / toggle
   - id: a_single
     then:
       - if:
@@ -105,7 +94,6 @@ script:
                 if (m == "Decoupled") eff = id(a_output_state);
                 else                   eff = (ha_on || rel_on);
                 id(a_last_known_on) = !eff;
-
             # OFF path
             - if:
                 condition:
@@ -129,12 +117,6 @@ script:
                         lambda: 'return id(mode_a).state == "Decoupled";'
                       then:
                         - lambda: 'id(a_output_state) = false;'
-                  - homeassistant.event:
-                      event: esphome.switchman_m5
-                      data:
-                        button: "A"
-                        action: "switch_off"
-
             # ON path
             - if:
                 condition:
@@ -158,12 +140,10 @@ script:
                         lambda: 'return id(mode_a).state == "Decoupled";'
                       then:
                         - lambda: 'id(a_output_state) = true;'
-                  - homeassistant.event:
-                      event: esphome.switchman_m5
-                      data:
-                        button: "A"
-                        action: "switch_on"
 
+            - text_sensor.template.publish:
+                id: a_last_action
+                state: "single"
             - script.execute: refresh_output
           else:
             # Offline behavior
@@ -174,6 +154,9 @@ script:
                   - lambda: 'id(a_output_state) = !id(a_output_state);'
                 else:
                   - switch.toggle: relay_a
+            - text_sensor.template.publish:
+                id: a_last_action
+                state: "single"
             - script.execute: refresh_output
 
   # Double click (single entity)
@@ -190,7 +173,16 @@ script:
                       service: ${a_double_service}
                       data:
                         entity_id: ${a_double_entity}
-      - button.press: button_a_double_click_action
+      - text_sensor.template.publish:
+          id: a_last_action
+          state: "double_click"
+      - binary_sensor.template.publish:
+          id: a_double_event
+          state: ON
+      - delay: 250ms
+      - binary_sensor.template.publish:
+          id: a_double_event
+          state: OFF
       - script.execute: refresh_output
 
   # Hold tick (single entity; repeated while held)
@@ -207,7 +199,6 @@ script:
                       service: ${a_hold_service}
                       data:
                         entity_id: ${a_hold_entity}
-      - button.press: button_a_hold_action
       - script.execute: refresh_output
 
   # Loop while the button stays pressed
@@ -221,6 +212,24 @@ script:
           then:
             - script.execute: a_hold_tick
             - delay: 150ms
+
+  # Quick burst helper so HA button can "simulate" a hold
+  - id: a_hold_burst
+    then:
+      - text_sensor.template.publish:
+          id: a_last_action
+          state: "hold"
+      - binary_sensor.template.publish:
+          id: a_hold_active
+          state: ON
+      - repeat:
+          count: 10
+          then:
+            - script.execute: a_hold_tick
+            - delay: 150ms
+      - binary_sensor.template.publish:
+          id: a_hold_active
+          state: OFF
 
   # Direct actions used by the Output switch
   - id: a_do_off
@@ -243,11 +252,6 @@ script:
             lambda: 'return id(mode_a).state == "Decoupled";'
           then:
             - lambda: 'id(a_output_state) = false;'
-      - homeassistant.event:
-          event: esphome.switchman_m5
-          data:
-            button: "A"
-            action: "switch_off"
       - script.execute: refresh_output
 
   - id: a_do_on
@@ -270,24 +274,15 @@ script:
             lambda: 'return id(mode_a).state == "Decoupled";'
           then:
             - lambda: 'id(a_output_state) = true;'
-      - homeassistant.event:
-          event: esphome.switchman_m5
-          data:
-            button: "A"
-            action: "switch_on"
       - script.execute: refresh_output
 
 # -------------------- IO (Sonoff M5 1-gang)
-# GPIO00: Button | GPIO23: Relay | GPIO19: Red LED (internal only) | GPIO05: Blue status LED
-output:
-  - platform: gpio
-    id: red_led_out
-    pin: GPIO19
-
+# GPIO00: Button | GPIO23: Relay | GPIO19: Red LED (as a switch) | GPIO05: Blue status LED
 light:
+  # Blue status LED (blinks when ON). We turn it OFF when connected via template sensor below.
   - platform: status_led
-    id: blue_status
-    name: "Blue Status LED"
+    id: blue
+    name: "Blue LED"
     pin:
       number: GPIO5
       inverted: true
@@ -295,6 +290,12 @@ light:
     internal: true
 
 switch:
+  - platform: gpio
+    id: red
+    name: "Red LED"
+    pin: GPIO19
+    restore_mode: RESTORE_DEFAULT_OFF
+
   - platform: gpio
     id: relay_a
     name: "Relay A"
@@ -342,6 +343,11 @@ switch:
     turn_off_action:
       - script.execute: a_do_off
       - script.execute: refresh_output
+    # Drive LED like before (no HA event emission)
+    on_turn_on:
+      - switch.turn_on: red
+    on_turn_off:
+      - switch.turn_off: red
 
 # -------------------- Config selects & numbers
 select:
@@ -409,9 +415,18 @@ binary_sensor:
             condition:
               binary_sensor.is_on: btn_a
             then:
+              - text_sensor.template.publish:
+                  id: a_last_action
+                  state: "hold"
+              - binary_sensor.template.publish:
+                  id: a_hold_active
+                  state: ON
               - script.execute: a_hold_loop
     on_release:
       then:
+        - binary_sensor.template.publish:
+            id: a_hold_active
+            state: OFF
         - script.stop: a_hold_loop
 
   - platform: status
@@ -419,17 +434,32 @@ binary_sensor:
     id: sensor_status
     disabled_by_default: true
 
-  # Keep blue status LED strictly for connectivity (OFF when connected)
+  # EXACTLY like your original:
+  # - When API connected -> turn OFF blue LED (no blink)
+  # - When API disconnected -> turn ON blue LED (blink)
   - platform: template
-    id: api_connected
     name: "API connected"
+    id: sensor_api_connected
     internal: true
+    entity_category: diagnostic
     device_class: connectivity
     lambda: return global_api_server->is_connected();
     on_press:
-      - light.turn_off: blue_status
+      - light.turn_off: blue
     on_release:
-      - light.turn_on: blue_status
+      - light.turn_on: blue
+
+  # Momentary event pulse for visibility in HA when a physical/simulated double click occurs
+  - platform: template
+    id: a_double_event
+    name: "Button A double click (event)"
+    entity_category: diagnostic
+
+  # Shows when a hold is currently active
+  - platform: template
+    id: a_hold_active
+    name: "Button A holding"
+    entity_category: diagnostic
 
 sensor:
   - platform: wifi_signal
@@ -498,6 +528,11 @@ text_sensor:
     entity_category: diagnostic
     disabled_by_default: true
 
+  - platform: template
+    name: "Button A last action"
+    id: a_last_action
+    entity_category: diagnostic
+
   - platform: version
     name: "ESPHome Version"
 
@@ -545,25 +580,18 @@ globals:
     initial_value: "0"
 
 button:
+  # Use these from HA UI/automations to trigger the same logic as a physical double-click/hold
   - platform: template
     name: "Button A double click action"
     id: button_a_double_click_action
     on_press:
-      - homeassistant.event:
-          event: esphome.switchman_m5
-          data:
-            button: "A"
-            action: "double_click"
+      - script.execute: a_double
 
   - platform: template
     name: "Button A hold action"
     id: button_a_hold_action
     on_press:
-      - homeassistant.event:
-          event: esphome.switchman_m5
-          data:
-            button: "A"
-            action: "hold"
+      - script.execute: a_hold_burst
 
   - platform: factory_reset
     name: "Load Factory Settings"
