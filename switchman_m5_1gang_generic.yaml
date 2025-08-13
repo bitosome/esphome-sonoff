@@ -278,6 +278,12 @@ script:
 
 # -------------------- IO (Sonoff M5 1-gang)
 # GPIO00: Button | GPIO23: Relay | GPIO19: Red LED (as a switch) | GPIO05: Blue status LED
+output:
+  - platform: ledc
+    id: panel_pwm
+    pin: GPIO18
+    frequency: 1000 Hz
+
 light:
   # Blue status LED (blinks when ON). We turn it OFF when connected via template sensor below.
   - platform: status_led
@@ -345,9 +351,12 @@ switch:
       - script.execute: refresh_output
     # Drive LED like before (no HA event emission)
     on_turn_on:
+      - output.set_level: { id: panel_pwm, level: 1.0 }
       - switch.turn_on: red
     on_turn_off:
       - switch.turn_off: red
+      - output.set_level: { id: panel_pwm, level: 1.0 }
+      - output.set_level: { id: panel_pwm, level: 1.0 }
 
 # -------------------- Config selects & numbers
 select:
@@ -433,7 +442,6 @@ binary_sensor:
     name: "API Status"
     id: sensor_status
     disabled_by_default: true
-    entity_category: diagnostic
 
   # EXACTLY like your original:
   # - When API connected -> turn OFF blue LED (no blink)
@@ -453,13 +461,13 @@ binary_sensor:
   # Momentary event pulse for visibility in HA when a physical/simulated double click occurs
   - platform: template
     id: a_double_event
-    name: "Button A double click event"
+    name: "Button A double click (event)"
     entity_category: diagnostic
 
   # Shows when a hold is currently active
   - platform: template
     id: a_hold_active
-    name: "Button A hold event"
+    name: "Button A holding"
     entity_category: diagnostic
 
 sensor:
@@ -593,6 +601,11 @@ button:
     id: button_a_hold_action
     on_press:
       - script.execute: a_hold_burst
+
+  - platform: factory_reset
+    name: "Load Factory Settings"
+    id: factory_reset_all
+    icon: mdi:factory
 
   - platform: restart
     name: "Reboot Device"
