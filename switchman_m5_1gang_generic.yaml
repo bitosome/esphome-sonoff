@@ -1,7 +1,7 @@
 substitutions:
   device_model: "Switchman M5 (1-Gang)"
   device_make: "Sonoff"
-  package_version: "3.4.1"
+  package_version: "3.4.2"
 
   # Defaults (override in mini as needed)
   indicator_led_default: "Red"            # Red | None
@@ -17,7 +17,7 @@ esphome:
     priority: -100
     then:
       - lambda: 'id(cpu_speed) = ESP.getCpuFreqMHz();'
-      - light.turn_on: blue_status
+      - light.turn_on: blue_status           # blink until API connects
       - light.turn_off: red_backlight
       - switch.turn_off: red_led
       - script.execute: refresh_output
@@ -64,7 +64,11 @@ web_server:
   port: 80
 
 # -------------------- IO (Sonoff M5 1-gang) --------------------
-# GPIO00: Button 1 | GPIO23: Relay 1 | GPIO19: LED1 (red) | GPIO05: Status (blue, inverted) | GPIO18: PWM red backlight
+# GPIO00: Button 1
+# GPIO23: Relay 1
+# GPIO19: LED1 (red, digital ON/OFF)
+# GPIO05: Status LED (blue, inverted)
+# GPIO18: PWM for LED1 (red dim/backlight)
 output:
   - platform: ledc
     id: red_pwm
@@ -72,6 +76,7 @@ output:
     frequency: 1000 Hz
 
 light:
+  # Blue status LED (blinks when ON; api_connected turns OFF when connected)
   - platform: status_led
     id: blue_status
     name: "Blue Status LED"
@@ -80,8 +85,8 @@ light:
       inverted: true
       ignore_strapping_warning: true
     internal: true
-    restore_mode: ALWAYS_OFF
 
+  # Red PWM backlight (used only when effective output is OFF)
   - platform: monochromatic
     id: red_backlight
     name: "Red Backlight (PWM)"
@@ -91,6 +96,7 @@ light:
     restore_mode: RESTORE_DEFAULT_OFF
 
 switch:
+  # Physical relay
   - platform: gpio
     id: relay_a
     name: "Relay A"
@@ -119,18 +125,20 @@ switch:
       then:
         - script.execute: refresh_output
 
+  # Red LED1 indicator (digital ON/OFF)
   - platform: gpio
     id: red_led
     name: "Red LED (indicator)"
     pin: GPIO19
     restore_mode: RESTORE_DEFAULT_OFF
 
+  # Effective output exposed to HA
   - platform: template
     id: a_output
     name: "Switch Button A state"
     icon: mdi:light-switch
     lambda: |-
-      // Decide where to read "HA on": self (relay) vs HA entity
+      // Compute "HA on" depending on follow mode
       bool use_self = std::string("${a_follow_mode}") == "self";
       bool ha_on = use_self ? id(relay_a).state
                             : (id(a_state).has_state() && id(a_state).state == "on");
@@ -146,20 +154,27 @@ switch:
       - script.execute: a_do_off
       - script.execute: refresh_output
 
+# -------------------- Config selects & numbers --------------------
 select:
   - platform: template
     id: mode_a
     name: "Mode A"
-    options: [Relay only, Smart only, Smart + Relay]
+    options:
+      - Relay only
+      - Smart only
+      - Smart + Relay
     optimistic: true
     restore_value: true
-    initial_option: ${default_mode_a}
+    initial_option: ${default_mode_a}     # <-- set per device in mini
     entity_category: config
 
   - platform: template
     id: behavior_a
     name: "Relay A behavior"
-    options: [Latching, Momentary 200ms, Inching]
+    options:
+      - Latching
+      - Momentary 200ms
+      - Inching
     optimistic: true
     restore_value: true
     initial_option: "Latching"
@@ -168,7 +183,9 @@ select:
   - platform: template
     id: indicator_led
     name: "Indicator LED"
-    options: [Red, None]
+    options:
+      - Red
+      - None
     optimistic: true
     restore_value: true
     initial_option: ${indicator_led_default}
@@ -186,7 +203,9 @@ number:
     restore_value: true
     entity_category: config
 
+# -------------------- Inputs & status --------------------
 binary_sensor:
+  # Button (GPIO0 is a strapping pin; safe with pullup)
   - platform: gpio
     id: btn_a
     pin:
@@ -224,6 +243,7 @@ binary_sensor:
     id: sensor_status
     disabled_by_default: true
 
+  # Manage blue status LED: OFF when connected, ON (blink) when disconnected
   - platform: template
     id: api_connected
     name: "API connected"
@@ -317,7 +337,7 @@ text_sensor:
     mac_address:
       name: "MAC"
 
-  # Only used when a_follow_mode == "ha". If left blank or invalid, it just won't update.
+  # Only used when a_follow_mode == "ha"
   - platform: homeassistant
     id: a_state
     internal: true
@@ -338,6 +358,7 @@ globals:
     restore_value: no
     initial_value: 'false'
 
+  # Optimistic state used in Smart only (decoupled) mode
   - id: a_output_state
     type: bool
     restore_value: no
@@ -349,13 +370,16 @@ globals:
     initial_value: "0"
 
 button:
+  # Compatibility event buttons (optional)
   - platform: template
     name: "Button A double click action"
     id: button_a_double_click_action
     on_press:
       - homeassistant.event:
           event: esphome.switchman_m5
-          data: { button: A, action: double_click }
+          data:
+            button: "A"
+            action: "double_click"
 
   - platform: template
     name: "Button A hold action"
@@ -363,8 +387,11 @@ button:
     on_press:
       - homeassistant.event:
           event: esphome.switchman_m5
-          data: { button: A, action: hold }
+          data:
+            button: "A"
+            action: "hold"
 
+  # Local test helpers
   - platform: template
     name: "Simulate Double Click"
     on_press:
@@ -386,7 +413,9 @@ button:
     icon: mdi:power-cycle
     entity_category: diagnostic
 
+# -------------------- Scripts --------------------
 script:
+  # Compute effective output & drive indicators (no mixing)
   - id: refresh_output
     then:
       - lambda: |-
@@ -401,15 +430,19 @@ script:
           else eff = (ha_on || rel_on);
           id(a_output).publish_state(eff);
 
+      # Reset indicators
       - light.turn_off: red_backlight
       - switch.turn_off: red_led
+      # blue_status blinking is managed by api_connected
 
+      # If ON and indicator is Red, turn red LED on
       - if:
           condition:
             lambda: 'return id(a_output).state && id(indicator_led).state == std::string("Red");'
           then:
             - switch.turn_on: red_led
 
+      # If OFF and backlight configured, apply red PWM backlight
       - if:
           condition:
             lambda: 'return !id(a_output).state && ${backlight_brightness_pct} > 0;'
@@ -418,6 +451,7 @@ script:
                 id: red_backlight
                 brightness: !lambda 'return ${backlight_brightness_pct} / 100.0f;'
 
+  # Single press
   - id: a_single
     then:
       - if:
@@ -435,6 +469,7 @@ script:
                 else eff = (ha_on || rel_on);
                 id(a_last_known_on) = !eff;
 
+            # OFF path
             - if:
                 condition:
                   lambda: 'return !id(a_last_known_on);'
@@ -450,7 +485,8 @@ script:
                       then:
                         - homeassistant.service:
                             service: ${a_off_service}
-                            data: { entity_id: ${a_off_entity} }
+                            data:
+                              entity_id: ${a_off_entity}
                   - if:
                       condition:
                         lambda: 'return id(mode_a).state == "Smart only";'
@@ -458,8 +494,11 @@ script:
                         - lambda: 'id(a_output_state) = false;'
                   - homeassistant.event:
                       event: esphome.switchman_m5
-                      data: { button: A, action: switch_off }
+                      data:
+                        button: "A"
+                        action: "switch_off"
 
+            # ON path
             - if:
                 condition:
                   lambda: 'return id(a_last_known_on);'
@@ -475,7 +514,8 @@ script:
                       then:
                         - homeassistant.service:
                             service: ${a_on_service}
-                            data: { entity_id: ${a_on_entity} }
+                            data:
+                              entity_id: ${a_on_entity}
                   - if:
                       condition:
                         lambda: 'return id(mode_a).state == "Smart only";'
@@ -483,10 +523,13 @@ script:
                         - lambda: 'id(a_output_state) = true;'
                   - homeassistant.event:
                       event: esphome.switchman_m5
-                      data: { button: A, action: switch_on }
+                      data:
+                        button: "A"
+                        action: "switch_on"
 
             - script.execute: refresh_output
           else:
+            # Offline behavior
             - if:
                 condition:
                   lambda: 'return id(mode_a).state == "Smart only";'
@@ -496,6 +539,7 @@ script:
                   - switch.toggle: relay_a
             - script.execute: refresh_output
 
+  # Double click (single entity)
   - id: a_double
     then:
       - if:
@@ -507,10 +551,12 @@ script:
                 then:
                   - homeassistant.service:
                       service: ${a_double_service}
-                      data: { entity_id: ${a_double_entity} }
+                      data:
+                        entity_id: ${a_double_entity}
       - button.press: button_a_double_click_action
       - script.execute: refresh_output
 
+  # Hold tick (single entity; repeated while held)
   - id: a_hold_tick
     then:
       - if:
@@ -522,7 +568,8 @@ script:
                 then:
                   - homeassistant.service:
                       service: ${a_hold_service}
-                      data: { entity_id: ${a_hold_entity} }
+                      data:
+                        entity_id: ${a_hold_entity}
       - button.press: button_a_hold_action
       - script.execute: refresh_output
 
@@ -545,6 +592,7 @@ script:
             - script.execute: a_hold_tick
             - delay: 150ms
 
+  # Direct actions used by the Output switch
   - id: a_do_off
     then:
       - if:
@@ -558,7 +606,8 @@ script:
           then:
             - homeassistant.service:
                 service: ${a_off_service}
-                data: { entity_id: ${a_off_entity} }
+                data:
+                  entity_id: ${a_off_entity}
       - if:
           condition:
             lambda: 'return id(mode_a).state == "Smart only";'
@@ -566,7 +615,9 @@ script:
             - lambda: 'id(a_output_state) = false;'
       - homeassistant.event:
           event: esphome.switchman_m5
-          data: { button: A, action: switch_off }
+          data:
+            button: "A"
+            action: "switch_off"
       - script.execute: refresh_output
 
   - id: a_do_on
@@ -582,7 +633,8 @@ script:
           then:
             - homeassistant.service:
                 service: ${a_on_service}
-                data: { entity_id: ${a_on_entity} }
+                data:
+                  entity_id: ${a_on_entity}
       - if:
           condition:
             lambda: 'return id(mode_a).state == "Smart only";'
@@ -590,5 +642,7 @@ script:
             - lambda: 'id(a_output_state) = true;'
       - homeassistant.event:
           event: esphome.switchman_m5
-          data: { button: A, action: switch_on }
+          data:
+            button: "A"
+            action: "switch_on"
       - script.execute: refresh_output
