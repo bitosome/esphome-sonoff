@@ -1,7 +1,7 @@
 substitutions:
   device_model: "Switchman M5 (1-Gang)"
   device_make: "Sonoff"
-  package_version: "3.4.2"
+  package_version: "3.4.3"
 
   # Defaults (override in mini as needed)
   indicator_led_default: "Red"            # Red | None
@@ -337,7 +337,7 @@ text_sensor:
     mac_address:
       name: "MAC"
 
-  # Only used when a_follow_mode == "ha"
+  # Only used when a_follow_mode == "ha". Must contain exactly one dot.
   - platform: homeassistant
     id: a_state
     internal: true
@@ -523,126 +523,3 @@ script:
                         - lambda: 'id(a_output_state) = true;'
                   - homeassistant.event:
                       event: esphome.switchman_m5
-                      data:
-                        button: "A"
-                        action: "switch_on"
-
-            - script.execute: refresh_output
-          else:
-            # Offline behavior
-            - if:
-                condition:
-                  lambda: 'return id(mode_a).state == "Smart only";'
-                then:
-                  - lambda: 'id(a_output_state) = !id(a_output_state);'
-                else:
-                  - switch.toggle: relay_a
-            - script.execute: refresh_output
-
-  # Double click (single entity)
-  - id: a_double
-    then:
-      - if:
-          condition: api.connected
-          then:
-            - if:
-                condition:
-                  lambda: 'return strlen("${a_double_entity}") > 0;'
-                then:
-                  - homeassistant.service:
-                      service: ${a_double_service}
-                      data:
-                        entity_id: ${a_double_entity}
-      - button.press: button_a_double_click_action
-      - script.execute: refresh_output
-
-  # Hold tick (single entity; repeated while held)
-  - id: a_hold_tick
-    then:
-      - if:
-          condition: api.connected
-          then:
-            - if:
-                condition:
-                  lambda: 'return strlen("${a_hold_entity}") > 0;'
-                then:
-                  - homeassistant.service:
-                      service: ${a_hold_service}
-                      data:
-                        entity_id: ${a_hold_entity}
-      - button.press: button_a_hold_action
-      - script.execute: refresh_output
-
-  - id: a_hold_loop
-    then:
-      - while:
-          condition:
-            and:
-              - binary_sensor.is_on: btn_a
-              - api.connected
-          then:
-            - script.execute: a_hold_tick
-            - delay: 150ms
-
-  - id: a_hold_burst
-    then:
-      - repeat:
-          count: 10
-          then:
-            - script.execute: a_hold_tick
-            - delay: 150ms
-
-  # Direct actions used by the Output switch
-  - id: a_do_off
-    then:
-      - if:
-          condition:
-            lambda: 'return id(mode_a).state != "Smart only";'
-          then:
-            - switch.turn_off: relay_a
-      - if:
-          condition:
-            lambda: 'return strlen("${a_off_entity}") > 0;'
-          then:
-            - homeassistant.service:
-                service: ${a_off_service}
-                data:
-                  entity_id: ${a_off_entity}
-      - if:
-          condition:
-            lambda: 'return id(mode_a).state == "Smart only";'
-          then:
-            - lambda: 'id(a_output_state) = false;'
-      - homeassistant.event:
-          event: esphome.switchman_m5
-          data:
-            button: "A"
-            action: "switch_off"
-      - script.execute: refresh_output
-
-  - id: a_do_on
-    then:
-      - if:
-          condition:
-            lambda: 'return id(mode_a).state != "Smart only";'
-          then:
-            - switch.turn_on: relay_a
-      - if:
-          condition:
-            lambda: 'return strlen("${a_on_entity}") > 0;'
-          then:
-            - homeassistant.service:
-                service: ${a_on_service}
-                data:
-                  entity_id: ${a_on_entity}
-      - if:
-          condition:
-            lambda: 'return id(mode_a).state == "Smart only";'
-          then:
-            - lambda: 'id(a_output_state) = true;'
-      - homeassistant.event:
-          event: esphome.switchman_m5
-          data:
-            button: "A"
-            action: "switch_on"
-      - script.execute: refresh_output
