@@ -1,11 +1,8 @@
 substitutions:
   device_model: "Switchman M5 (1-Gang)"
   device_make: "Sonoff"
-  package_version: "3.4.5"
+  package_version: "3.5.0"
 
-  # Defaults (override in mini as needed)
-  indicator_led_default: "Red"            # Red | None
-  backlight_brightness_pct: "70"          # 0–100
   log_level: INFO
   timezone: "Europe/Tallinn"
 
@@ -18,7 +15,6 @@ esphome:
     then:
       - lambda: 'id(cpu_speed) = ESP.getCpuFreqMHz();'
       - light.turn_on: blue_status           # blink until API connects
-      - light.turn_off: red_backlight
       - switch.turn_off: red_led
       - script.execute: refresh_output
 
@@ -67,7 +63,7 @@ web_server:
 # SCRIPTS (early so all IDs exist before use)
 # ----------------------------------------------------------------
 script:
-  # Compute effective output & drive indicators (no mixing of red LED/backlight)
+  # Compute effective output & drive front LEDs (no backlight, no mixing)
   - id: refresh_output
     then:
       - lambda: |-
@@ -81,23 +77,16 @@ script:
           else if (m == "Smart only") eff = id(a_output_state);
           else eff = (ha_on || rel_on);
           id(a_output).publish_state(eff);
-      # Reset indicators
-      - light.turn_off: red_backlight
-      - switch.turn_off: red_led
-      # Show red ON indicator if selected
+      # Front indicator policy for 1-gang:
+      # - Red ON when button (a_output) is ON
+      # - Otherwise ALL front LEDs OFF
       - if:
           condition:
-            lambda: 'return id(a_output).state && id(indicator_led).state == std::string("Red");'
+            lambda: 'return id(a_output).state;'
           then:
             - switch.turn_on: red_led
-      # Show red PWM backlight when OFF if configured
-      - if:
-          condition:
-            lambda: 'return !id(a_output).state && ${backlight_brightness_pct} > 0;'
-          then:
-            - light.turn_on:
-                id: red_backlight
-                brightness: !lambda 'return ${backlight_brightness_pct} / 100.0f;'
+          else:
+            - switch.turn_off: red_led
 
   # Single press / toggle logic
   - id: a_single
@@ -289,12 +278,8 @@ script:
       - script.execute: refresh_output
 
 # -------------------- IO (Sonoff M5 1-gang)
-output:
-  - platform: ledc
-    id: red_pwm
-    pin: GPIO18
-    frequency: 1000 Hz
-
+# GPIO00: Button | GPIO23: Relay | GPIO19: Red LED | GPIO05: Blue status LED
+# (No PWM/backlight component anymore)
 light:
   - platform: status_led
     id: blue_status
@@ -304,14 +289,6 @@ light:
       inverted: true
       ignore_strapping_warning: true
     internal: true
-
-  - platform: monochromatic
-    id: red_backlight
-    name: "Red Backlight (PWM)"
-    output: red_pwm
-    icon: "mdi:led-outline"
-    entity_category: config
-    restore_mode: RESTORE_DEFAULT_OFF
 
 switch:
   - platform: gpio
@@ -394,17 +371,6 @@ select:
     initial_option: "Latching"
     entity_category: config
 
-  - platform: template
-    id: indicator_led
-    name: "Indicator LED"
-    options:
-      - Red
-      - None
-    optimistic: true
-    restore_value: true
-    initial_option: ${indicator_led_default}
-    entity_category: config
-
 number:
   - platform: template
     id: inching_a_secs
@@ -456,6 +422,7 @@ binary_sensor:
     id: sensor_status
     disabled_by_default: true
 
+  # Keep blue status LED strictly for connectivity (OFF when connected)
   - platform: template
     id: api_connected
     name: "API connected"
