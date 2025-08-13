@@ -1,7 +1,7 @@
 substitutions:
   device_model: "Switchman M5 (1-Gang)"
   device_make: "Sonoff"
-  package_version: "3.5.0"
+  package_version: "3.5.1"
 
   log_level: INFO
   timezone: "Europe/Tallinn"
@@ -15,7 +15,7 @@ esphome:
     then:
       - lambda: 'id(cpu_speed) = ESP.getCpuFreqMHz();'
       - light.turn_on: blue_status           # blink until API connects
-      - switch.turn_off: red_led
+      - output.turn_off: red_led_out         # front LED dark at boot
       - script.execute: refresh_output
 
 logger:
@@ -77,16 +77,17 @@ script:
           else if (m == "Smart only") eff = id(a_output_state);
           else eff = (ha_on || rel_on);
           id(a_output).publish_state(eff);
+
       # Front indicator policy for 1-gang:
-      # - Red ON when button (a_output) is ON
+      # - Red ON when "Switch Button A state" is ON
       # - Otherwise ALL front LEDs OFF
       - if:
           condition:
             lambda: 'return id(a_output).state;'
           then:
-            - switch.turn_on: red_led
+            - output.turn_on: red_led_out
           else:
-            - switch.turn_off: red_led
+            - output.turn_off: red_led_out
 
   # Single press / toggle logic
   - id: a_single
@@ -278,8 +279,12 @@ script:
       - script.execute: refresh_output
 
 # -------------------- IO (Sonoff M5 1-gang)
-# GPIO00: Button | GPIO23: Relay | GPIO19: Red LED | GPIO05: Blue status LED
-# (No PWM/backlight component anymore)
+# GPIO00: Button | GPIO23: Relay | GPIO19: Red LED (internal only) | GPIO05: Blue status LED
+output:
+  - platform: gpio
+    id: red_led_out
+    pin: GPIO19
+
 light:
   - platform: status_led
     id: blue_status
@@ -319,12 +324,7 @@ switch:
       then:
         - script.execute: refresh_output
 
-  - platform: gpio
-    id: red_led
-    name: "Red LED (indicator)"
-    pin: GPIO19
-    restore_mode: RESTORE_DEFAULT_OFF
-
+  # Effective output exposed to HA (button/“smart” state)
   - platform: template
     id: a_output
     name: "Switch Button A state"
