@@ -1,7 +1,7 @@
 substitutions:
   device_model: "Switchman M5 (1-Gang)"
   device_make: "Sonoff"
-  package_version: "3.4.4"
+  package_version: "3.4.5"
 
   # Defaults (override in mini as needed)
   indicator_led_default: "Red"            # Red | None
@@ -64,7 +64,7 @@ web_server:
   port: 80
 
 # ----------------------------------------------------------------
-# SCRIPTS (put early so all IDs exist before use)
+# SCRIPTS (early so all IDs exist before use)
 # ----------------------------------------------------------------
 script:
   # Compute effective output & drive indicators (no mixing of red LED/backlight)
@@ -229,15 +229,6 @@ script:
             and:
               - binary_sensor.is_on: btn_a
               - api.connected
-          then:
-            - script.execute: a_hold_tick
-            - delay: 150ms
-
-  # Quick burst helper
-  - id: a_hold_burst
-    then:
-      - repeat:
-          count: 10
           then:
             - script.execute: a_hold_tick
             - delay: 150ms
@@ -609,16 +600,6 @@ button:
           data:
             button: "A"
             action: "hold"
-
-  - platform: template
-    name: "Simulate Double Click"
-    on_press:
-      - script.execute: a_double
-
-  - platform: template
-    name: "Simulate Hold (1.5s)"
-    on_press:
-      - script.execute: a_hold_burst
 
   - platform: factory_reset
     name: "Load Factory Settings"
