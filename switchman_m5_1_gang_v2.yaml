@@ -47,7 +47,7 @@ substitutions:
   momentary_duration: 200ms         # Fixed for "Momentary 200ms"
 
   # Failover (Decoupled -> Coupled when HA offline)
-  failover_default: 1             # 1 = enabled, 0 = disabled
+  failover_default: "1"             # 1 = enabled, 0 = disabled
 
   # HA service wiring (leave empty to do nothing)
   button_a_on_service: ""           # e.g. "switch.turn_on"
