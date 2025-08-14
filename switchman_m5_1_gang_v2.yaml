@@ -1,11 +1,10 @@
 substitutions:
-  # Device identity (adjust to your setup)
   device_friendly_name: ""
   device_name: ""
   device_ip: ""
   device_make: "Sonoff"
   device_model: "Switchman M5 (1-Gang)"
-  package_version: "3.0.2"
+  package_version: "3.1.0"
 
   api_key: !secret api_key
   wifi_ssid: !secret wifi_ssid
@@ -13,45 +12,35 @@ substitutions:
   ota_password: !secret ota_password
   ap_password: !secret ap_password
 
-  # Hardware pins (Sonoff Switchman M5 1-Gang defaults)
-  button_a_gpio: GPIO00           # Button A
-  relay_a_gpio: GPIO23            # Relay A
-  led_indicator_gpio: GPIO19      # Red LED
-  led_status_gpio: GPIO05         # Blue LED
-  led_pwm_output_gpio: GPIO18     # LED PWM output
+  button_a_gpio: GPIO00
+  relay_a_gpio: GPIO23
+  led_indicator_gpio: GPIO19
+  led_status_gpio: GPIO05
+  led_pwm_output_gpio: GPIO18
 
-  # Runtime & logging
   log_level: INFO
   timezone: "Europe/Tallinn"
 
-  # Button timings
   filter_delay_on: 50ms
   filter_delay_off: 50ms
 
-  # Single click timings
-  timing_click_1: ON for at most 500ms
-  timing_click_2: OFF for at least 100ms
-
-  # Double click timings
+  # Double & hold timings (single is instant via on_press)
   timing_double_click_1: ON for at most 300ms
   timing_double_click_2: OFF for at most 200ms
   timing_double_click_3: ON for at most 300ms
   timing_double_click_4: OFF for at least 120ms
 
-  # Hold timings
   timing_hold: ON for at least 1s
   timing_hold_repeat: 500ms
 
-  # Behavior selections
-  default_mode_a: "Coupled"         # Coupled | Decoupled
-  momentary_duration: 200ms         # Fixed for "Momentary 200ms"
+  default_mode_a: "Coupled"   # Coupled | Decoupled
 
   # Failover (Decoupled -> Coupled when HA offline)
-  failover_default: "1"             # 1 = enabled, 0 = disabled
+  failover_default: "1"
 
   # HA service wiring (leave empty to do nothing)
-  button_a_on_service: ""           # e.g. "switch.turn_on"
-  button_a_on_entity: ""            # e.g. "switch.some_switch"
+  button_a_on_service: ""
+  button_a_on_entity: ""
   button_a_off_service: ""
   button_a_off_entity: ""
   button_a_double_service: ""
@@ -69,9 +58,17 @@ esphome:
       then:
         - lambda: |-
             id(cpu_speed) = ESP.getCpuFreqMHz();
+    # First-boot default for failover
+    - priority: 850.0
+      then:
+        - lambda: |-
+            if (!id(settings_initialized)) {
+              id(failover_flag) = ${failover_default};
+              id(settings_initialized) = true;
+            }
+    # Sync relay <-> button state in Coupled
     - priority: 600.0
       then:
-        # Sync relay to button state at boot when Coupled (avoids mismatch after reboot)
         - if:
             condition:
               lambda: 'return id(mode_a).state == std::string("Coupled");'
@@ -112,8 +109,6 @@ ota:
     password: ${ota_password}
 
 api:
-  # encryption:
-  #   key: "${api_key}"
 
 web_server:
   port: 80
@@ -131,15 +126,16 @@ globals:
     restore_value: no
     initial_value: "0"
 
-  # Persisted flag for failover (1/0)
   - id: failover_flag
     type: int
     restore_value: yes
-    initial_value: ${failover_default}
+    initial_value: "0"
 
-# ---------------------------
-# Sensors / Text sensors
-# ---------------------------
+  - id: settings_initialized
+    type: bool
+    restore_value: yes
+    initial_value: "false"
+
 text_sensor:
   - platform: wifi_info
     ip_address:
@@ -169,11 +165,11 @@ sensor:
             state: !lambda |-
               int seconds = round(id(sensor_uptime).raw_state);
               int days = seconds / (24 * 3600);
-              seconds = seconds % (24 * 3600);
+              seconds %= 24 * 3600;
               int hours = seconds / 3600;
-              seconds = seconds % 3600;
+              seconds %= 3600;
               int minutes = seconds / 60;
-              seconds = seconds % 60;
+              seconds %= 60;
               return (
                 (days ? String(days) + "d " : "") +
                 (hours ? String(hours) + "h " : "") +
@@ -212,9 +208,6 @@ sensor:
     update_interval: 60s
     entity_category: "diagnostic"
 
-# ---------------------------
-# Buttons (utility + virtual)
-# ---------------------------
 button:
   - platform: restart
     name: "Reboot Device"
@@ -222,7 +215,7 @@ button:
     icon: mdi:power-cycle
     entity_category: "diagnostic"
 
-  # Virtual buttons to simulate gestures from HA
+  # Virtual gestures
   - platform: template
     name: "Button A double click action"
     id: button_a_sim_double
@@ -235,9 +228,6 @@ button:
     on_press:
       - script.execute: a_hold_action
 
-# ---------------------------
-# Outputs / Lights (LEDs)
-# ---------------------------
 output:
   - platform: ledc
     id: pwm_output
@@ -245,7 +235,6 @@ output:
     frequency: 1000 Hz
 
 light:
-  # HIDDEN from HA UI, still used internally for backlight control
   - platform: monochromatic
     output: pwm_output
     name: "Red LED"
@@ -255,7 +244,6 @@ light:
     icon: 'mdi:led-outline'
     entity_category: 'config'
 
-  # HIDDEN from HA UI, still used internally for status blink
   - platform: status_led
     name: "Blue LED"
     id: led_status
@@ -266,9 +254,6 @@ light:
       ignore_strapping_warning: true
     restore_mode: RESTORE_DEFAULT_ON
 
-# ---------------------------
-# Switches (relay + indicator + failover toggle)
-# ---------------------------
 switch:
   - platform: gpio
     name: "LED indicator"
@@ -284,43 +269,32 @@ switch:
     on_turn_on:
       - switch.turn_on: led_indicator
       - script.execute: a_on_action
-      # Mirror to button state in Coupled mode
       - if:
           condition:
             lambda: 'return id(mode_a).state == std::string("Coupled") && id(button_a_state).state == false;'
           then:
             - switch.turn_on: button_a_state
-      # Auto-off when "Inching" is selected, using number.inching_a_secs
-      - if:
-          condition:
-            lambda: 'return id(behavior_a).state == std::string("Inching");'
-          then:
-            - script.execute: inching_a_off
     on_turn_off:
       - switch.turn_off: led_indicator
       - script.execute: a_off_action
-      # Mirror to button state in Coupled mode
       - if:
           condition:
             lambda: 'return id(mode_a).state == std::string("Coupled") && id(button_a_state).state == true;'
           then:
             - switch.turn_off: button_a_state
 
-  # Internal state used in Decoupled mode to track ON/OFF
   - platform: template
     name: "Button A state"
     id: button_a_state
     optimistic: true
-    restore_mode: RESTORE_DEFAULT_OFF   # (was restore_state: true)
+    restore_mode: RESTORE_DEFAULT_OFF
     on_turn_on:
       - switch.turn_on: led_indicator
-      # Only call HA action when DECOUPLED, to avoid duplicates in Coupled
       - if:
           condition:
             lambda: 'return id(mode_a).state == std::string("Decoupled");'
           then:
             - script.execute: a_on_action
-      # Mirror to relay in Coupled mode
       - if:
           condition:
             lambda: 'return id(mode_a).state == std::string("Coupled") && id(relay_a).state == false;'
@@ -328,20 +302,17 @@ switch:
             - switch.turn_on: relay_a
     on_turn_off:
       - switch.turn_off: led_indicator
-      # Only call HA action when DECOUPLED, to avoid duplicates in Coupled
       - if:
           condition:
             lambda: 'return id(mode_a).state == std::string("Decoupled");'
           then:
             - script.execute: a_off_action
-      # Mirror to relay in Coupled mode
       - if:
           condition:
             lambda: 'return id(mode_a).state == std::string("Coupled") && id(relay_a).state == true;'
           then:
             - switch.turn_off: relay_a
 
-  # UI toggle to enable/disable failover (Decoupled → Coupled when HA offline)
   - platform: template
     name: "Failover"
     id: failover_decoupled_switch
@@ -352,53 +323,19 @@ switch:
     turn_off_action:
       - lambda: 'id(failover_flag) = 0;'
 
-# ---------------------------
-# Selects (Mode & Behavior)
-# ---------------------------
 select:
   - platform: template
     id: mode_a
     name: "Button A mode"
-    options:
-      - Coupled
-      - Decoupled
+    options: [Coupled, Decoupled]
     optimistic: true
     restore_value: true
     initial_option: ${default_mode_a}
     entity_category: config
 
-  - platform: template
-    id: behavior_a
-    name: "Relay A behavior"
-    options:
-      - Latching
-      - Momentary 200ms
-      - Inching
-    optimistic: true
-    restore_value: true
-    initial_option: "Latching"
-    entity_category: config
+number: []
 
-# ---------------------------
-# Number (Inching seconds)
-# ---------------------------
-number:
-  - platform: template
-    id: inching_a_secs
-    name: "Inching A (s)"
-    min_value: 1
-    max_value: 600
-    step: 1
-    initial_value: 5
-    optimistic: true
-    restore_value: true
-    entity_category: config
-
-# ---------------------------
-# Binary sensors (button & status)
-# ---------------------------
 binary_sensor:
-  # Connection-driven blue LED behavior (unchanged)
   - platform: template
     name: "API connected"
     id: sensor_api_connected
@@ -411,12 +348,7 @@ binary_sensor:
     on_release:
       - light.turn_on: led_status
 
-  - platform: status
-    name: "API Status"
-    id: sensor_status
-    disabled_by_default: true
-
-  # Physical Button A (internal only)
+  # Physical A — INSTANT single via on_press
   - platform: gpio
     id: button_a
     internal: true
@@ -428,10 +360,22 @@ binary_sensor:
     filters:
       - delayed_on: ${filter_delay_on}
       - delayed_off: ${filter_delay_off}
-
-    # Mutually-exclusive gesture handling
+    on_press:
+      - if:
+          condition:
+            lambda: |-
+              const bool coupled = (id(mode_a).state == std::string("Coupled"));
+              const bool decoupled_failover =
+                  (id(mode_a).state == std::string("Decoupled"))
+                  && (id(failover_flag) == 1)
+                  && (!global_api_server->is_connected());
+              return coupled || decoupled_failover;
+          then:
+            - switch.toggle: relay_a
+          else:
+            - switch.toggle: button_a_state
     on_multi_click:
-      # Double click (first so it wins over single)
+      # Double click
       - timing:
           - ${timing_double_click_1}
           - ${timing_double_click_2}
@@ -440,8 +384,7 @@ binary_sensor:
         then:
           - button.press: button_a_sim_double
           - script.execute: a_double_action
-
-      # Hold (spams the virtual hold button)
+      # Hold (repeat)
       - timing:
           - ${timing_hold}
         then:
@@ -455,66 +398,8 @@ binary_sensor:
                 - delay: ${timing_hold_repeat}
           - light.turn_off: led_status
 
-      # Single click
-      - timing:
-          - ${timing_click_1}
-          - ${timing_click_2}
-        then:
-          - script.execute: a_single_press
-
-# ---------------------------
-# Action scripts
-# ---------------------------
 script:
-  # Single press behavior
-  - id: a_single_press
-    then:
-      - if:
-          condition:
-            lambda: |-
-              const bool coupled = (id(mode_a).state == std::string("Coupled"));
-              const bool decoupled_failover =
-                  (id(mode_a).state == std::string("Decoupled"))
-                  && (id(failover_flag) == 1)
-                  && (!global_api_server->is_connected());
-              return coupled || decoupled_failover;
-          then:
-            # Coupled or failover: drive the relay according to behavior
-            - if:
-                condition:
-                  lambda: 'return id(behavior_a).state == std::string("Latching");'
-                then:
-                  - switch.toggle: relay_a
-            - if:
-                condition:
-                  lambda: 'return id(behavior_a).state == std::string("Momentary 200ms");'
-                then:
-                  - switch.turn_on: relay_a
-                  - delay: ${momentary_duration}
-                  - switch.turn_off: relay_a
-            - if:
-                condition:
-                  lambda: 'return id(behavior_a).state == std::string("Inching");'
-                then:
-                  - switch.turn_on: relay_a
-          else:
-            # Decoupled (no failover): toggle the internal state only
-            - switch.toggle: button_a_state
-
-  # Turn relay off after N seconds (inching)
-  - id: inching_a_off
-    mode: restart
-    then:
-      - delay: !lambda |-
-          return (uint32_t)(id(inching_a_secs).state * 1000.0f);
-      - if:
-          condition:
-            switch.is_on: relay_a
-          then:
-            - switch.turn_off: relay_a
-
   - id: a_on_action
-    mode: restart
     then:
       - if:
           condition:
@@ -526,7 +411,6 @@ script:
                   entity_id: "${button_a_on_entity}"
 
   - id: a_off_action
-    mode: restart
     then:
       - if:
           condition:
@@ -538,7 +422,6 @@ script:
                   entity_id: "${button_a_off_entity}"
 
   - id: a_double_action
-    mode: restart
     then:
       - if:
           condition:
@@ -550,7 +433,6 @@ script:
                   entity_id: "${button_a_double_entity}"
 
   - id: a_hold_action
-    mode: restart
     then:
       - if:
           condition:
