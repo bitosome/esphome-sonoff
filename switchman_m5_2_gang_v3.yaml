@@ -4,7 +4,7 @@ substitutions:
   device_ip: ""
   device_make: "Sonoff"
   device_model: "Switchman M5 (2-Gang)"
-  package_version: "3.1.0"
+  package_version: "3.0.0"
 
   api_key: !secret api_key
   wifi_ssid: !secret wifi_ssid
@@ -459,7 +459,6 @@ binary_sensor:
       number: ${button_a_gpio}
       mode: INPUT_PULLUP
       inverted: true
-      ignore_strapping_warning: true
     filters:
       - delayed_on: ${filter_delay_on}
       - delayed_off: ${filter_delay_off}
