@@ -200,13 +200,13 @@ button:
 
   # Virtual buttons to simulate gestures from HA
   - platform: template
-    name: "Button A – Simulate Double Click"
+    name: "Button A double click action"
     id: button_a_sim_double
     on_press:
       - script.execute: a_double_action
 
   - platform: template
-    name: "Button A – Simulate Hold"
+    name: "Button A hold action"
     id: button_a_sim_hold
     on_press:
       - script.execute: a_hold_action
@@ -333,7 +333,7 @@ switch:
 select:
   - platform: template
     id: mode_a
-    name: "Mode - Button A"
+    name: "Button A mode"
     options:
       - Coupled
       - Decoupled
@@ -446,6 +446,7 @@ binary_sensor:
           - ${timing_double_click_3}
           - ${timing_double_click_4}
         then:
+          - button.press: button_a_sim_double     # NEW: log it in HA
           - script.execute: a_double_action
 
       # Hold detection (repeat while held)
@@ -457,6 +458,7 @@ binary_sensor:
                 binary_sensor.is_on: button_a
               then:
                 - light.toggle: led_status
+                - button.press: button_a_sim_hold  # NEW: spam presses in HA
                 - script.execute: a_hold_action
                 - delay: ${timing_hold_repeat}
           - light.turn_off: led_status
