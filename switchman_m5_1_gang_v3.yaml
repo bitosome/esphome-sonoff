@@ -3,7 +3,7 @@ substitutions:
   device_name: ""
   device_ip: ""
   device_make: "Sonoff"
-  device_model: "Switchman M5 (2-Gang)"
+  device_model: "Switchman M5 (1-Gang)"
   package_version: "3.1.0"
 
   api_key: !secret api_key
@@ -12,11 +12,9 @@ substitutions:
   ota_password: !secret ota_password
   ap_password: !secret ap_password
 
-  button_a_gpio: GPIO04
-  button_b_gpio: GPIO15
+  button_a_gpio: GPIO00
   relay_a_gpio: GPIO23
-  relay_b_gpio: GPIO19
-  led_indicator_gpio: GPIO22
+  led_indicator_gpio: GPIO19
   led_status_gpio: GPIO05
   led_pwm_output_gpio: GPIO18
 
@@ -35,12 +33,12 @@ substitutions:
   timing_hold: ON for at least 1s
   timing_hold_repeat: 500ms
 
-  default_mode_a: "Coupled"
-  default_mode_b: "Coupled"
+  default_mode_a: "Coupled"   # Coupled | Decoupled
 
+  # Failover (Decoupled -> Coupled when HA offline)
   failover_default: "1"
 
-  # HA actions — A
+  # HA service wiring (leave empty to do nothing)
   button_a_on_service: ""
   button_a_on_entity: ""
   button_a_off_service: ""
@@ -49,16 +47,6 @@ substitutions:
   button_a_double_entity: ""
   button_a_hold_service: ""
   button_a_hold_entity: ""
-
-  # HA actions — B
-  button_b_on_service: ""
-  button_b_on_entity: ""
-  button_b_off_service: ""
-  button_b_off_entity: ""
-  button_b_double_service: ""
-  button_b_double_entity: ""
-  button_b_hold_service: ""
-  button_b_hold_entity: ""
 
 esphome:
   name: "${device_name}"
@@ -78,7 +66,7 @@ esphome:
               id(failover_flag) = ${failover_default};
               id(settings_initialized) = true;
             }
-    # Sync relays to button states at boot when Coupled
+    # Sync relay <-> button state in Coupled
     - priority: 600.0
       then:
         - if:
@@ -96,21 +84,6 @@ esphome:
                           - switch.turn_on: relay_a
                         else:
                           - switch.turn_off: relay_a
-        - if:
-            condition:
-              lambda: 'return id(mode_b).state == std::string("Coupled");'
-            then:
-              - if:
-                  condition:
-                    lambda: 'return id(button_b_state).state != id(relay_b).state;'
-                  then:
-                    - if:
-                        condition:
-                          lambda: 'return id(button_b_state).state;'
-                        then:
-                          - switch.turn_on: relay_b
-                        else:
-                          - switch.turn_off: relay_b
 
 esp32:
   board: esp32dev
@@ -242,31 +215,18 @@ button:
     icon: mdi:power-cycle
     entity_category: "diagnostic"
 
-  # Virtual gestures (A)
+  # Virtual gestures
   - platform: template
     name: "Button A double click action"
     id: button_a_sim_double
     on_press:
-      - script.execute: a_double_press
+      - script.execute: a_double_action
 
   - platform: template
     name: "Button A hold action"
     id: button_a_sim_hold
     on_press:
-      - script.execute: a_hold_press
-
-  # Virtual gestures (B)
-  - platform: template
-    name: "Button B double click action"
-    id: button_b_sim_double
-    on_press:
-      - script.execute: b_double_press
-
-  - platform: template
-    name: "Button B hold action"
-    id: button_b_sim_hold
-    on_press:
-      - script.execute: b_hold_press
+      - script.execute: a_hold_action
 
 output:
   - platform: ledc
@@ -295,20 +255,19 @@ light:
     restore_mode: RESTORE_DEFAULT_ON
 
 switch:
-  # Red indicator (channel B), hidden
   - platform: gpio
     name: "LED indicator"
     id: led_indicator
     internal: true
     pin: ${led_indicator_gpio}
 
-  # Relay A
   - platform: gpio
     name: "Relay A"
     id: relay_a
     pin: ${relay_a_gpio}
     restore_mode: RESTORE_DEFAULT_OFF
     on_turn_on:
+      - switch.turn_on: led_indicator
       - script.execute: a_on_action
       - if:
           condition:
@@ -316,6 +275,7 @@ switch:
           then:
             - switch.turn_on: button_a_state
     on_turn_off:
+      - switch.turn_off: led_indicator
       - script.execute: a_off_action
       - if:
           condition:
@@ -323,36 +283,13 @@ switch:
           then:
             - switch.turn_off: button_a_state
 
-  # Relay B
-  - platform: gpio
-    name: "Relay B"
-    id: relay_b
-    pin: ${relay_b_gpio}
-    restore_mode: RESTORE_DEFAULT_OFF
-    on_turn_on:
-      - switch.turn_on: led_indicator
-      - script.execute: b_on_action
-      - if:
-          condition:
-            lambda: 'return id(mode_b).state == std::string("Coupled") && id(button_b_state).state == false;'
-          then:
-            - switch.turn_on: button_b_state
-    on_turn_off:
-      - switch.turn_off: led_indicator
-      - script.execute: b_off_action
-      - if:
-          condition:
-            lambda: 'return id(mode_b).state == std::string("Coupled") && id(button_b_state).state == true;'
-          then:
-            - switch.turn_off: button_b_state
-
-  # Button A state (virtual)
   - platform: template
     name: "Button A state"
     id: button_a_state
     optimistic: true
     restore_mode: RESTORE_DEFAULT_OFF
     on_turn_on:
+      - switch.turn_on: led_indicator
       - if:
           condition:
             lambda: 'return id(mode_a).state == std::string("Decoupled");'
@@ -364,6 +301,7 @@ switch:
           then:
             - switch.turn_on: relay_a
     on_turn_off:
+      - switch.turn_off: led_indicator
       - if:
           condition:
             lambda: 'return id(mode_a).state == std::string("Decoupled");'
@@ -375,38 +313,6 @@ switch:
           then:
             - switch.turn_off: relay_a
 
-  # Button B state (virtual)
-  - platform: template
-    name: "Button B state"
-    id: button_b_state
-    optimistic: true
-    restore_mode: RESTORE_DEFAULT_OFF
-    on_turn_on:
-      - switch.turn_on: led_indicator
-      - if:
-          condition:
-            lambda: 'return id(mode_b).state == std::string("Decoupled");'
-          then:
-            - script.execute: b_on_action
-      - if:
-          condition:
-            lambda: 'return id(mode_b).state == std::string("Coupled") && id(relay_b).state == false;'
-          then:
-            - switch.turn_on: relay_b
-    on_turn_off:
-      - switch.turn_off: led_indicator
-      - if:
-          condition:
-            lambda: 'return id(mode_b).state == std::string("Decoupled");'
-          then:
-            - script.execute: b_off_action
-      - if:
-          condition:
-            lambda: 'return id(mode_b).state == std::string("Coupled") && id(relay_b).state == true;'
-          then:
-            - switch.turn_off: relay_b
-
-  # Failover (Decoupled → Coupled when HA offline)
   - platform: template
     name: "Failover"
     id: failover_decoupled_switch
@@ -427,15 +333,6 @@ select:
     initial_option: ${default_mode_a}
     entity_category: config
 
-  - platform: template
-    id: mode_b
-    name: "Button B mode"
-    options: [Coupled, Decoupled]
-    optimistic: true
-    restore_value: true
-    initial_option: ${default_mode_b}
-    entity_category: config
-
 number: []
 
 binary_sensor:
@@ -451,7 +348,7 @@ binary_sensor:
     on_release:
       - light.turn_on: led_status
 
-  # Physical A — INSTANT single
+  # Physical A — INSTANT single via on_press
   - platform: gpio
     id: button_a
     internal: true
@@ -478,6 +375,7 @@ binary_sensor:
           else:
             - switch.toggle: button_a_state
     on_multi_click:
+      # Double click
       - timing:
           - ${timing_double_click_1}
           - ${timing_double_click_2}
@@ -485,7 +383,8 @@ binary_sensor:
           - ${timing_double_click_4}
         then:
           - button.press: button_a_sim_double
-          - script.execute: a_double_press
+          - script.execute: a_double_action
+      # Hold (repeat)
       - timing:
           - ${timing_hold}
         then:
@@ -495,60 +394,11 @@ binary_sensor:
               then:
                 - light.toggle: led_status
                 - button.press: button_a_sim_hold
-                - script.execute: a_hold_press
-                - delay: ${timing_hold_repeat}
-          - light.turn_off: led_status
-
-  # Physical B — INSTANT single
-  - platform: gpio
-    id: button_b
-    internal: true
-    pin:
-      number: ${button_b_gpio}
-      mode: INPUT_PULLUP
-      inverted: true
-      ignore_strapping_warning: true
-    filters:
-      - delayed_on: ${filter_delay_on}
-      - delayed_off: ${filter_delay_off}
-    on_press:
-      - if:
-          condition:
-            lambda: |-
-              const bool coupled = (id(mode_b).state == std::string("Coupled"));
-              const bool decoupled_failover =
-                  (id(mode_b).state == std::string("Decoupled"))
-                  && (id(failover_flag) == 1)
-                  && (!global_api_server->is_connected());
-              return coupled || decoupled_failover;
-          then:
-            - switch.toggle: relay_b
-          else:
-            - switch.toggle: button_b_state
-    on_multi_click:
-      - timing:
-          - ${timing_double_click_1}
-          - ${timing_double_click_2}
-          - ${timing_double_click_3}
-          - ${timing_double_click_4}
-        then:
-          - button.press: button_b_sim_double
-          - script.execute: b_double_press
-      - timing:
-          - ${timing_hold}
-        then:
-          - while:
-              condition:
-                binary_sensor.is_on: button_b
-              then:
-                - light.toggle: led_status
-                - button.press: button_b_sim_hold
-                - script.execute: b_hold_press
+                - script.execute: a_hold_action
                 - delay: ${timing_hold_repeat}
           - light.turn_off: led_status
 
 script:
-  # A actions
   - id: a_on_action
     then:
       - if:
@@ -571,7 +421,7 @@ script:
                 data:
                   entity_id: "${button_a_off_entity}"
 
-  - id: a_double_press
+  - id: a_double_action
     then:
       - if:
           condition:
@@ -582,7 +432,7 @@ script:
                 data:
                   entity_id: "${button_a_double_entity}"
 
-  - id: a_hold_press
+  - id: a_hold_action
     then:
       - if:
           condition:
@@ -592,48 +442,3 @@ script:
                 service: "${button_a_hold_service}"
                 data:
                   entity_id: "${button_a_hold_entity}"
-
-  # B actions
-  - id: b_on_action
-    then:
-      - if:
-          condition:
-            lambda: 'return std::string("${button_b_on_service}") != "" && std::string("${button_b_on_entity}") != "";'
-          then:
-            - homeassistant.service:
-                service: "${button_b_on_service}"
-                data:
-                  entity_id: "${button_b_on_entity}"
-
-  - id: b_off_action
-    then:
-      - if:
-          condition:
-            lambda: 'return std::string("${button_b_off_service}") != "" && std::string("${button_b_off_entity}") != "";'
-          then:
-            - homeassistant.service:
-                service: "${button_b_off_service}"
-                data:
-                  entity_id: "${button_b_off_entity}"
-
-  - id: b_double_press
-    then:
-      - if:
-          condition:
-            lambda: 'return std::string("${button_b_double_service}") != "" && std::string("${button_b_double_entity}") != "";'
-          then:
-            - homeassistant.service:
-                service: "${button_b_double_service}"
-                data:
-                  entity_id: "${button_b_double_entity}"
-
-  - id: b_hold_press
-    then:
-      - if:
-          condition:
-            lambda: 'return std::string("${button_b_hold_service}") != "" && std::string("${button_b_hold_entity}") != "";'
-          then:
-            - homeassistant.service:
-                service: "${button_b_hold_service}"
-                data:
-                  entity_id: "${button_b_hold_entity}"
