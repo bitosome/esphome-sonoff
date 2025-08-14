@@ -5,7 +5,7 @@ substitutions:
   device_ip: ""
   device_make: "Sonoff"
   device_model: "Switchman M5 (1-Gang)"
-  package_version: "3.0.1"
+  package_version: "3.0.2"
 
   api_key: !secret api_key
   wifi_ssid: !secret wifi_ssid
@@ -69,6 +69,24 @@ esphome:
       then:
         - lambda: |-
             id(cpu_speed) = ESP.getCpuFreqMHz();
+    - priority: 600.0
+      then:
+        # Sync relay to button state at boot when Coupled (avoids mismatch after reboot)
+        - if:
+            condition:
+              lambda: 'return id(mode_a).state == std::string("Coupled");'
+            then:
+              - if:
+                  condition:
+                    lambda: 'return id(button_a_state).state != id(relay_a).state;'
+                  then:
+                    - if:
+                        condition:
+                          lambda: 'return id(button_a_state).state;'
+                        then:
+                          - switch.turn_on: relay_a
+                        else:
+                          - switch.turn_off: relay_a
 
 esp32:
   board: esp32dev
@@ -293,7 +311,7 @@ switch:
     name: "Button A state"
     id: button_a_state
     optimistic: true
-    restore_state: true
+    restore_mode: RESTORE_DEFAULT_OFF   # (was restore_state: true)
     on_turn_on:
       - switch.turn_on: led_indicator
       # Only call HA action when DECOUPLED, to avoid duplicates in Coupled
@@ -411,9 +429,9 @@ binary_sensor:
       - delayed_on: ${filter_delay_on}
       - delayed_off: ${filter_delay_off}
 
-    # NOTE: removed on_press to avoid overlap with double/hold
+    # Mutually-exclusive gesture handling
     on_multi_click:
-      # Double click (put first so it wins over single)
+      # Double click (first so it wins over single)
       - timing:
           - ${timing_double_click_1}
           - ${timing_double_click_2}
@@ -423,7 +441,7 @@ binary_sensor:
           - button.press: button_a_sim_double
           - script.execute: a_double_action
 
-      # Hold
+      # Hold (spams the virtual hold button)
       - timing:
           - ${timing_hold}
         then:
