@@ -113,9 +113,9 @@ globals:
     restore_value: yes
     initial_value: ${failover_default}
 
-#------------------------
+# ---------------------------
 # Sensors / Text sensors
-#------------------------
+# ---------------------------
 text_sensor:
   - platform: wifi_info
     ip_address:
@@ -188,9 +188,9 @@ sensor:
     update_interval: 60s
     entity_category: "diagnostic"
 
-#------------------------
+# ---------------------------
 # Buttons (utility + virtual)
-#------------------------
+# ---------------------------
 button:
   - platform: restart
     name: "Reboot Device"
@@ -216,9 +216,9 @@ button:
     on_press:
       - script.execute: a_hold_action
 
-#------------------------
+# ---------------------------
 # Outputs / Lights (LEDs)
-#------------------------
+# ---------------------------
 output:
   - platform: ledc
     id: pwm_output
@@ -226,25 +226,30 @@ output:
     frequency: 1000 Hz
 
 light:
+  # HIDDEN from HA UI, still used internally for backlight control
   - platform: monochromatic
     output: pwm_output
     name: "Red LED"
+    id: red_led_backlight
+    internal: true
     restore_mode: RESTORE_DEFAULT_OFF
     icon: 'mdi:led-outline'
     entity_category: 'config'
 
+  # HIDDEN from HA UI, still used internally for status blink
   - platform: status_led
     name: "Blue LED"
     id: led_status
+    internal: true
     pin:
       number: ${led_status_gpio}
       inverted: true
       ignore_strapping_warning: true
     restore_mode: RESTORE_DEFAULT_ON
 
-#------------------------
+# ---------------------------
 # Switches (relay + indicator + failover toggle)
-#------------------------
+# ---------------------------
 switch:
   - platform: gpio
     name: "LED indicator"
@@ -259,6 +264,12 @@ switch:
     on_turn_on:
       - switch.turn_on: led_indicator
       - script.execute: a_on_action
+      # Mirror to button state in Coupled mode
+      - if:
+          condition:
+            lambda: 'return id(mode_a).state == std::string("Coupled") && id(button_a_state).state == false;'
+          then:
+            - switch.turn_on: button_a_state
       # Auto-off when "Inching" is selected, using number.inching_a_secs
       - if:
           condition:
@@ -268,6 +279,12 @@ switch:
     on_turn_off:
       - switch.turn_off: led_indicator
       - script.execute: a_off_action
+      # Mirror to button state in Coupled mode
+      - if:
+          condition:
+            lambda: 'return id(mode_a).state == std::string("Coupled") && id(button_a_state).state == true;'
+          then:
+            - switch.turn_off: button_a_state
 
   # Internal state used in Decoupled mode to track ON/OFF
   - platform: template
@@ -277,9 +294,21 @@ switch:
     on_turn_on:
       - switch.turn_on: led_indicator
       - script.execute: a_on_action
+      # Mirror to relay in Coupled mode
+      - if:
+          condition:
+            lambda: 'return id(mode_a).state == std::string("Coupled") && id(relay_a).state == false;'
+          then:
+            - switch.turn_on: relay_a
     on_turn_off:
       - switch.turn_off: led_indicator
       - script.execute: a_off_action
+      # Mirror to relay in Coupled mode
+      - if:
+          condition:
+            lambda: 'return id(mode_a).state == std::string("Coupled") && id(relay_a).state == true;'
+          then:
+            - switch.turn_off: relay_a
 
   # UI toggle to enable/disable failover
   - platform: template
@@ -292,9 +321,9 @@ switch:
     turn_off_action:
       - lambda: 'id(failover_flag) = 0;'
 
-#------------------------
+# ---------------------------
 # Selects (Mode & Behavior)
-#------------------------
+# ---------------------------
 select:
   - platform: template
     id: mode_a
@@ -319,9 +348,9 @@ select:
     initial_option: "Latching"
     entity_category: config
 
-#------------------------
+# ---------------------------
 # Number (Inching seconds)
-#------------------------
+# ---------------------------
 number:
   - platform: template
     id: inching_a_secs
@@ -334,9 +363,9 @@ number:
     restore_value: true
     entity_category: config
 
-#------------------------
+# ---------------------------
 # Binary sensors (button & status)
-#------------------------
+# ---------------------------
 binary_sensor:
   # Connection-driven blue LED behavior (unchanged)
   - platform: template
@@ -425,9 +454,9 @@ binary_sensor:
                 - delay: ${timing_hold_repeat}
           - light.turn_off: led_status
 
-#------------------------
+# ---------------------------
 # Action scripts
-#------------------------
+# ---------------------------
 script:
   # Turn relay off after N seconds (inching)
   - id: inching_a_off
