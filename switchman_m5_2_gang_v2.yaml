@@ -35,10 +35,10 @@ substitutions:
   timing_click_2: OFF for at least 100ms
 
   # Double click timings
-  timing_double_click_1: ON for at most 500ms
-  timing_double_click_2: OFF for at most 400ms
-  timing_double_click_3: ON for at most 500ms
-  timing_double_click_4: OFF for at least 250ms
+  timing_double_click_1: ON for at most 300ms
+  timing_double_click_2: OFF for at most 200ms
+  timing_double_click_3: ON for at most 300ms
+  timing_double_click_4: OFF for at least 120ms
 
   # Hold timings
   timing_hold: ON for at least 1s
