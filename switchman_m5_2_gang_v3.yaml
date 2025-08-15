@@ -4,7 +4,7 @@ substitutions:
   device_ip: ""
   device_make: "Sonoff"
   device_model: "Switchman M5 (2-Gang)"
-  package_version: "3.0.0"
+  package_version: "3.0.1"
 
   api_key: !secret api_key
   wifi_ssid: !secret wifi_ssid
@@ -78,7 +78,7 @@ esphome:
               id(failover_flag) = ${failover_default};
               id(settings_initialized) = true;
             }
-    # Sync relays to button states at boot when Coupled
+    # Sync relays to button states at boot when Coupled + set blue LED to A state
     - priority: 600.0
       then:
         - if:
@@ -111,6 +111,14 @@ esphome:
                           - switch.turn_on: relay_b
                         else:
                           - switch.turn_off: relay_b
+        # Blue LED follows Button A state at boot
+        - if:
+            condition:
+              lambda: 'return id(button_a_state).state;'
+            then:
+              - light.turn_on: led_status
+            else:
+              - light.turn_off: led_status
 
 esp32:
   board: esp32dev
@@ -346,29 +354,36 @@ switch:
           then:
             - switch.turn_off: button_b_state
 
-  # Button A state (virtual)
   - platform: template
     name: "Button A state"
     id: button_a_state
     optimistic: true
     restore_mode: RESTORE_DEFAULT_OFF
     on_turn_on:
+      # Drive blue LED from A state
+      - light.turn_on: led_status
+      # Only call HA action when DECOUPLED
       - if:
           condition:
             lambda: 'return id(mode_a).state == std::string("Decoupled");'
           then:
             - script.execute: a_on_action
+      # Mirror to Relay A in Coupled
       - if:
           condition:
             lambda: 'return id(mode_a).state == std::string("Coupled") && id(relay_a).state == false;'
           then:
             - switch.turn_on: relay_a
     on_turn_off:
+      # Drive blue LED from A state
+      - light.turn_off: led_status
+      # Only call HA action when DECOUPLED
       - if:
           condition:
             lambda: 'return id(mode_a).state == std::string("Decoupled");'
           then:
             - script.execute: a_off_action
+      # Mirror to Relay A in Coupled
       - if:
           condition:
             lambda: 'return id(mode_a).state == std::string("Coupled") && id(relay_a).state == true;'
@@ -446,10 +461,6 @@ binary_sensor:
     entity_category: 'diagnostic'
     device_class: 'connectivity'
     lambda: return global_api_server->is_connected();
-    on_press:
-      - light.turn_off: led_status
-    on_release:
-      - light.turn_on: led_status
 
   # Physical A — INSTANT single
   - platform: gpio
@@ -477,6 +488,7 @@ binary_sensor:
           else:
             - switch.toggle: button_a_state
     on_multi_click:
+      # Double click
       - timing:
           - ${timing_double_click_1}
           - ${timing_double_click_2}
@@ -485,6 +497,7 @@ binary_sensor:
         then:
           - button.press: button_a_sim_double
           - script.execute: a_double_press
+      # Hold (repeat)
       - timing:
           - ${timing_hold}
         then:
@@ -496,7 +509,14 @@ binary_sensor:
                 - button.press: button_a_sim_hold
                 - script.execute: a_hold_press
                 - delay: ${timing_hold_repeat}
-          - light.turn_off: led_status
+          # restore LED to A state
+          - if:
+              condition:
+                lambda: 'return id(button_a_state).state;'
+            then:
+              - light.turn_on: led_status
+            else:
+              - light.turn_off: led_status
 
   # Physical B — INSTANT single
   - platform: gpio
@@ -525,6 +545,7 @@ binary_sensor:
           else:
             - switch.toggle: button_b_state
     on_multi_click:
+      # Double click
       - timing:
           - ${timing_double_click_1}
           - ${timing_double_click_2}
@@ -533,6 +554,7 @@ binary_sensor:
         then:
           - button.press: button_b_sim_double
           - script.execute: b_double_press
+      # Hold (repeat)
       - timing:
           - ${timing_hold}
         then:
@@ -544,7 +566,14 @@ binary_sensor:
                 - button.press: button_b_sim_hold
                 - script.execute: b_hold_press
                 - delay: ${timing_hold_repeat}
-          - light.turn_off: led_status
+          # restore LED to A state
+          - if:
+              condition:
+                lambda: 'return id(button_a_state).state;'
+            then:
+              - light.turn_on: led_status
+            else:
+              - light.turn_off: led_status
 
 script:
   # A actions
