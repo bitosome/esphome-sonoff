@@ -176,7 +176,7 @@ text_sensor:
     ip_address:
       id: ip_address
       name: "IP Address"
-      icon: "mdi:wan"
+    icon: "mdi:wan"
 
   - platform: template
     name: "Uptime"
@@ -354,6 +354,7 @@ switch:
           then:
             - switch.turn_off: button_b_state
 
+  # Button A state (virtual) — drives blue LED
   - platform: template
     name: "Button A state"
     id: button_a_state
@@ -451,9 +452,8 @@ select:
     initial_option: ${default_mode_b}
     entity_category: config
 
-number: []
-
 binary_sensor:
+  # Connectivity sensor retained, but no LED overrides here
   - platform: template
     name: "API connected"
     id: sensor_api_connected
@@ -467,9 +467,10 @@ binary_sensor:
     id: button_a
     internal: true
     pin:
-      number: ${button_a_gpio}
+      number: ${button_a_gpio}   # GPIO04
       mode: INPUT_PULLUP
       inverted: true
+      # GPIO4 is not a strapping pin; do not set ignore_strapping_warning here
     filters:
       - delayed_on: ${filter_delay_on}
       - delayed_off: ${filter_delay_off}
@@ -513,17 +514,17 @@ binary_sensor:
           - if:
               condition:
                 lambda: 'return id(button_a_state).state;'
-            then:
-              - light.turn_on: led_status
-            else:
-              - light.turn_off: led_status
+              then:
+                - light.turn_on: led_status
+              else:
+                - light.turn_off: led_status
 
   # Physical B — INSTANT single
   - platform: gpio
     id: button_b
     internal: true
     pin:
-      number: ${button_b_gpio}
+      number: ${button_b_gpio}   # GPIO15
       mode: INPUT_PULLUP
       inverted: true
       ignore_strapping_warning: true
@@ -570,10 +571,10 @@ binary_sensor:
           - if:
               condition:
                 lambda: 'return id(button_a_state).state;'
-            then:
-              - light.turn_on: led_status
-            else:
-              - light.turn_off: led_status
+              then:
+                - light.turn_on: led_status
+              else:
+                - light.turn_off: led_status
 
 script:
   # A actions
