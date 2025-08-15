@@ -176,7 +176,7 @@ text_sensor:
     ip_address:
       id: ip_address
       name: "IP Address"
-    icon: "mdi:wan"
+      icon: "mdi:wan"
 
   - platform: template
     name: "Uptime"
