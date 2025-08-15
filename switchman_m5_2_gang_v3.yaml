@@ -4,7 +4,7 @@ substitutions:
   device_ip: ""
   device_make: "Sonoff"
   device_model: "Switchman M5 (2-Gang)"
-  package_version: "3.0.1"
+  package_version: "3.1.0"
 
   api_key: !secret api_key
   wifi_ssid: !secret wifi_ssid
@@ -38,8 +38,6 @@ substitutions:
   default_mode_a: "Coupled"
   default_mode_b: "Coupled"
 
-  failover_default: "1"
-
   # HA actions — A
   button_a_on_service: ""
   button_a_on_entity: ""
@@ -70,14 +68,6 @@ esphome:
       then:
         - lambda: |-
             id(cpu_speed) = ESP.getCpuFreqMHz();
-    # First-boot default for failover
-    - priority: 850.0
-      then:
-        - lambda: |-
-            if (!id(settings_initialized)) {
-              id(failover_flag) = ${failover_default};
-              id(settings_initialized) = true;
-            }
     # Sync relays to button states at boot when Coupled + set blue LED to A state
     - priority: 600.0
       then:
@@ -160,16 +150,6 @@ globals:
     type: int
     restore_value: no
     initial_value: "0"
-
-  - id: failover_flag
-    type: int
-    restore_value: yes
-    initial_value: "0"
-
-  - id: settings_initialized
-    type: bool
-    restore_value: yes
-    initial_value: "false"
 
 text_sensor:
   - platform: wifi_info
@@ -422,17 +402,6 @@ switch:
           then:
             - switch.turn_off: relay_b
 
-  # Failover (Decoupled → Coupled when HA offline)
-  - platform: template
-    name: "Failover"
-    id: failover_decoupled_switch
-    entity_category: config
-    lambda: 'return id(failover_flag) == 1;'
-    turn_on_action:
-      - lambda: 'id(failover_flag) = 1;'
-    turn_off_action:
-      - lambda: 'id(failover_flag) = 0;'
-
 select:
   - platform: template
     id: mode_a
@@ -453,7 +422,6 @@ select:
     entity_category: config
 
 binary_sensor:
-  # Connectivity sensor retained, but no LED overrides here
   - platform: template
     name: "API connected"
     id: sensor_api_connected
@@ -479,10 +447,10 @@ binary_sensor:
           condition:
             lambda: |-
               const bool coupled = (id(mode_a).state == std::string("Coupled"));
+              // Automatic failover when API/Wi-Fi is not available
               const bool decoupled_failover =
-                  (id(mode_a).state == std::string("Decoupled"))
-                  && (id(failover_flag) == 1)
-                  && (!global_api_server->is_connected());
+                  (id(mode_a).state == std::string("Decoupled")) &&
+                  (!global_api_server->is_connected());
               return coupled || decoupled_failover;
           then:
             - switch.toggle: relay_a
@@ -524,7 +492,7 @@ binary_sensor:
     id: button_b
     internal: true
     pin:
-      number: ${button_b_gpio}   # GPIO15
+      number: ${button_b_gpio}   # GPIO15 (strapping pin)
       mode: INPUT_PULLUP
       inverted: true
       ignore_strapping_warning: true
@@ -536,10 +504,10 @@ binary_sensor:
           condition:
             lambda: |-
               const bool coupled = (id(mode_b).state == std::string("Coupled"));
+              // Automatic failover when API/Wi-Fi is not available
               const bool decoupled_failover =
-                  (id(mode_b).state == std::string("Decoupled"))
-                  && (id(failover_flag) == 1)
-                  && (!global_api_server->is_connected());
+                  (id(mode_b).state == std::string("Decoupled")) &&
+                  (!global_api_server->is_connected());
               return coupled || decoupled_failover;
           then:
             - switch.toggle: relay_b

@@ -4,7 +4,7 @@ substitutions:
   device_ip: ""
   device_make: "Sonoff"
   device_model: "Switchman M5 (1-Gang)"
-  package_version: "3.0.0"
+  package_version: "3.1.0"
 
   api_key: !secret api_key
   wifi_ssid: !secret wifi_ssid
@@ -35,9 +35,6 @@ substitutions:
 
   default_mode_a: "Coupled"   # Coupled | Decoupled
 
-  # Failover (Decoupled -> Coupled when HA offline)
-  failover_default: "1"
-
   # HA service wiring (leave empty to do nothing)
   button_a_on_service: ""
   button_a_on_entity: ""
@@ -58,15 +55,7 @@ esphome:
       then:
         - lambda: |-
             id(cpu_speed) = ESP.getCpuFreqMHz();
-    # First-boot default for failover
-    - priority: 850.0
-      then:
-        - lambda: |-
-            if (!id(settings_initialized)) {
-              id(failover_flag) = ${failover_default};
-              id(settings_initialized) = true;
-            }
-    # Sync relay <-> button state in Coupled
+    # Sync relay <-> button state in Coupled on boot
     - priority: 600.0
       then:
         - if:
@@ -125,16 +114,6 @@ globals:
     type: int
     restore_value: no
     initial_value: "0"
-
-  - id: failover_flag
-    type: int
-    restore_value: yes
-    initial_value: "0"
-
-  - id: settings_initialized
-    type: bool
-    restore_value: yes
-    initial_value: "false"
 
 text_sensor:
   - platform: wifi_info
@@ -313,16 +292,6 @@ switch:
           then:
             - switch.turn_off: relay_a
 
-  - platform: template
-    name: "Failover"
-    id: failover_decoupled_switch
-    entity_category: config
-    lambda: 'return id(failover_flag) == 1;'
-    turn_on_action:
-      - lambda: 'id(failover_flag) = 1;'
-    turn_off_action:
-      - lambda: 'id(failover_flag) = 0;'
-
 select:
   - platform: template
     id: mode_a
@@ -343,8 +312,25 @@ binary_sensor:
     entity_category: 'diagnostic'
     device_class: 'connectivity'
     lambda: return global_api_server->is_connected();
+    # When HA/API connection is present, turn the blue LED off and re-sync if needed
     on_press:
       - light.turn_off: led_status
+      - if:
+          condition:
+            lambda: 'return id(mode_a).state == std::string("Coupled");'
+          then:
+            - if:
+                condition:
+                  lambda: 'return id(button_a_state).state != id(relay_a).state;'
+                then:
+                  - if:
+                      condition:
+                        lambda: 'return id(button_a_state).state;'
+                      then:
+                        - switch.turn_on: relay_a
+                      else:
+                        - switch.turn_off: relay_a
+    # When HA/API connection drops, turn the blue LED on (failover active)
     on_release:
       - light.turn_on: led_status
 
@@ -365,10 +351,10 @@ binary_sensor:
           condition:
             lambda: |-
               const bool coupled = (id(mode_a).state == std::string("Coupled"));
+              // Automatic failover when API/Wi-Fi is not available
               const bool decoupled_failover =
-                  (id(mode_a).state == std::string("Decoupled"))
-                  && (id(failover_flag) == 1)
-                  && (!global_api_server->is_connected());
+                  (id(mode_a).state == std::string("Decoupled")) &&
+                  (!global_api_server->is_connected());
               return coupled || decoupled_failover;
           then:
             - switch.toggle: relay_a
