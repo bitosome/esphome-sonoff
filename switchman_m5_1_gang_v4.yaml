@@ -33,9 +33,9 @@ substitutions:
   timing_hold: ON for at least 1s
   timing_hold_repeat: 500ms
 
-  default_mode_a: "Coupled"              # Coupled | Decoupled
-  default_relay_a_target_mode: ""     # "On" or "Off" when HA/API is available
-  min_toggle_interval_ms: "250"          # ignore extra presses faster than this
+  default_mode_a: "Coupled"               # Coupled | Decoupled
+  default_relay_a_target_mode: "Off"      # "On" or "Off" when HA/API is available
+  min_toggle_interval_ms: "250"           # ignore extra presses faster than this
 
   # HA service wiring (leave empty to do nothing)
   button_a_on_service: ""
@@ -303,7 +303,9 @@ select:
   - platform: template
     id: mode_a
     name: "Button A mode"
-    options: [Coupled, Decoupled]
+    options:
+      - "Coupled"
+      - "Decoupled"
     optimistic: true
     restore_value: true
     initial_option: ${default_mode_a}
@@ -313,7 +315,9 @@ select:
   - platform: template
     id: relay_a_target_mode
     name: "Relay A target mode"
-    options: [On, Off]
+    options:
+      - "On"
+      - "Off"
     optimistic: true
     restore_value: true
     initial_option: ${default_relay_a_target_mode}
