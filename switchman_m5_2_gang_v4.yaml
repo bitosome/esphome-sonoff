@@ -35,10 +35,10 @@ substitutions:
   timing_hold: ON for at least 1s
   timing_hold_repeat: 500ms
 
-  default_mode_a: "Coupled"              # Coupled | Decoupled
-  default_mode_b: "Coupled"              # Coupled | Decoupled
-  default_relay_a_target_mode: "Off"     # "On" | "Off" when HA/API is available
-  default_relay_b_target_mode: "Off"     # "On" | "Off" when HA/API is available
+  default_mode_a: ""              # Coupled | Decoupled
+  default_mode_b: ""              # Coupled | Decoupled
+  default_relay_a_target_mode: ""     # "On" | "Off" when HA/API is available
+  default_relay_b_target_mode: ""     # "On" | "Off" when HA/API is available
   min_toggle_interval_ms: "250"          # ignore extra presses faster than this
 
   # HA actions — A
