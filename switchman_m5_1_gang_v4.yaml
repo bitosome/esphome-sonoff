@@ -33,6 +33,8 @@ substitutions:
   timing_hold: ON for at least 1s
   timing_hold_repeat: 500ms
 
+  default_mode_a: "Coupled"               # Coupled | Decoupled
+  default_relay_a_target_mode: "Off"      # "On" or "Off" when HA/API is available
   min_toggle_interval_ms: "250"           # ignore extra presses faster than this
 
   # HA service wiring (leave empty to do nothing)
@@ -332,12 +334,12 @@ binary_sensor:
     device_class: 'connectivity'
     lambda: return global_api_server->is_connected();
 
-    # When HA/API connection is present: go Decoupled and enforce Relay A target mode
+    # When HA/API connection is present: use default_mode_a + enforce target
     on_press:
       - light.turn_off: led_status
       - select.set:
           id: mode_a
-          option: "Decoupled"
+          option: "${default_mode_a}"
       - if:
           condition:
             lambda: 'return id(relay_a_target_mode).state == std::string("On");'
