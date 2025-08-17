@@ -35,10 +35,10 @@ substitutions:
   timing_hold: ON for at least 1s
   timing_hold_repeat: 500ms
 
-  default_mode_a: ""              # Coupled | Decoupled
-  default_mode_b: ""              # Coupled | Decoupled
-  default_relay_a_target_mode: ""     # "On" | "Off" when HA/API is available
-  default_relay_b_target_mode: ""     # "On" | "Off" when HA/API is available
+  default_mode_a: "Coupled"              # "Coupled" | "Decoupled"
+  default_mode_b: "Coupled"              # "Coupled" | "Decoupled"
+  default_relay_a_target_mode: "Off"     # "On" | "Off" when HA/API is available
+  default_relay_b_target_mode: "Off"     # "On" | "Off" when HA/API is available
   min_toggle_interval_ms: "250"          # ignore extra presses faster than this
 
   # HA actions — A
@@ -288,7 +288,7 @@ light:
     restore_mode: RESTORE_DEFAULT_ON
 
 switch:
-  # Red indicator (we'll mirror channel B like your original)
+  # Red indicator (mirrors channel B), hidden
   - platform: gpio
     name: "LED indicator"
     id: led_indicator
@@ -456,15 +456,15 @@ binary_sensor:
     device_class: 'connectivity'
     lambda: return global_api_server->is_connected();
 
-    # When HA/API is present: go Decoupled and enforce relay target modes
+    # When HA/API is present: use your defaults + enforce relay targets
     on_press:
       - light.turn_off: led_status
       - select.set:
           id: mode_a
-          option: "Decoupled"
+          option: "${default_mode_a}"
       - select.set:
           id: mode_b
-          option: "Decoupled"
+          option: "${default_mode_b}"
       - if:
           condition:
             lambda: 'return id(relay_a_target_mode).state == std::string("On");'
@@ -480,7 +480,7 @@ binary_sensor:
           else:
             - switch.turn_off: relay_b
 
-    # When HA/API drops: go Coupled and resync each relay with its button
+    # When HA/API drops: force Coupled and resync with buttons
     on_release:
       - light.turn_on: led_status
       - select.set:
