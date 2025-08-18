@@ -4,7 +4,7 @@ substitutions:
   device_ip: ""
   device_make: "Sonoff"
   device_model: "Switchman M5 (2-Gang)"
-  package_version: "4.0.1"
+  package_version: "4.0.2"
 
   api_key: !secret api_key
   wifi_ssid: !secret wifi_ssid
@@ -123,12 +123,84 @@ wifi:
   ap:
     ssid: ${device_name}
     password: ${ap_password}
+  on_disconnect:
+    then:
+      - if:
+          condition:
+            lambda: 'return id(mode_a).state != std::string("Coupled") || id(mode_b).state != std::string("Coupled");'
+          then:
+            - logger.log: "Wi-Fi lost -> preemptively entering fallback (Coupled) for A & B"
+            - select.set:
+                id: mode_a
+                option: "Coupled"
+            - select.set:
+                id: mode_b
+                option: "Coupled"
 
 ota:
   - platform: esphome
     password: ${ota_password}
 
 api:
+  on_client_connected:
+    then:
+      - logger.log: "API connected -> leaving fallback and restoring defaults"
+      - light.turn_off: led_status
+      - select.set:
+          id: mode_a
+          option: "${default_mode_a}"
+      - select.set:
+          id: mode_b
+          option: "${default_mode_b}"
+      # Enforce relay targets when API is up
+      - if:
+          condition:
+            lambda: 'return id(relay_a_target_mode).state == std::string("On");'
+          then:
+            - switch.turn_on: relay_a
+          else:
+            - switch.turn_off: relay_a
+      - if:
+          condition:
+            lambda: 'return id(relay_b_target_mode).state == std::string("On");'
+          then:
+            - switch.turn_on: relay_b
+          else:
+            - switch.turn_off: relay_b
+
+  on_client_disconnected:
+    then:
+      - logger.log: "API disconnected -> entering fallback (Coupled) and resyncing with buttons"
+      - light.turn_on: led_status
+      - select.set:
+          id: mode_a
+          option: "Coupled"
+      - select.set:
+          id: mode_b
+          option: "Coupled"
+      # Resync relays with button states
+      - if:
+          condition:
+            lambda: 'return id(button_a_state).state != id(relay_a).state;'
+          then:
+            - if:
+                condition:
+                  lambda: 'return id(button_a_state).state;'
+                then:
+                  - switch.turn_on: relay_a
+                else:
+                  - switch.turn_off: relay_a
+      - if:
+          condition:
+            lambda: 'return id(button_b_state).state != id(relay_b).state;'
+          then:
+            - if:
+                condition:
+                  lambda: 'return id(button_b_state).state;'
+                then:
+                  - switch.turn_on: relay_b
+                else:
+                  - switch.turn_off: relay_b
 
 web_server:
   port: 80
@@ -433,6 +505,19 @@ select:
     restore_value: true
     initial_option: ${default_relay_a_target_mode}
     entity_category: config
+    on_value:
+      then:
+        - if:
+            condition:
+              lambda: 'return global_api_server->is_connected();'
+            then:
+              - if:
+                  condition:
+                    lambda: 'return id(relay_a_target_mode).state == std::string("On");'
+                  then:
+                    - switch.turn_on: relay_a
+                  else:
+                    - switch.turn_off: relay_a
 
   - platform: template
     id: relay_b_target_mode
@@ -444,74 +529,23 @@ select:
     restore_value: true
     initial_option: ${default_relay_b_target_mode}
     entity_category: config
+    on_value:
+      then:
+        - if:
+            condition:
+              lambda: 'return global_api_server->is_connected();'
+            then:
+              - if:
+                  condition:
+                    lambda: 'return id(relay_b_target_mode).state == std::string("On");'
+                  then:
+                    - switch.turn_on: relay_b
+                  else:
+                    - switch.turn_off: relay_b
 
 number: []
 
 binary_sensor:
-  - platform: template
-    name: "API connected"
-    id: sensor_api_connected
-    internal: true
-    entity_category: 'diagnostic'
-    device_class: 'connectivity'
-    lambda: return global_api_server->is_connected();
-
-    # When HA/API is present: use your defaults + enforce relay targets
-    on_press:
-      - light.turn_off: led_status
-      - select.set:
-          id: mode_a
-          option: "${default_mode_a}"
-      - select.set:
-          id: mode_b
-          option: "${default_mode_b}"
-      - if:
-          condition:
-            lambda: 'return id(relay_a_target_mode).state == std::string("On");'
-          then:
-            - switch.turn_on: relay_a
-          else:
-            - switch.turn_off: relay_a
-      - if:
-          condition:
-            lambda: 'return id(relay_b_target_mode).state == std::string("On");'
-          then:
-            - switch.turn_on: relay_b
-          else:
-            - switch.turn_off: relay_b
-
-    # When HA/API drops: force Coupled and resync with buttons
-    on_release:
-      - light.turn_on: led_status
-      - select.set:
-          id: mode_a
-          option: "Coupled"
-      - select.set:
-          id: mode_b
-          option: "Coupled"
-      - if:
-          condition:
-            lambda: 'return id(button_a_state).state != id(relay_a).state;'
-          then:
-            - if:
-                condition:
-                  lambda: 'return id(button_a_state).state;'
-                then:
-                  - switch.turn_on: relay_a
-                else:
-                  - switch.turn_off: relay_a
-      - if:
-          condition:
-            lambda: 'return id(button_b_state).state != id(relay_b).state;'
-          then:
-            - if:
-                condition:
-                  lambda: 'return id(button_b_state).state;'
-                then:
-                  - switch.turn_on: relay_b
-                else:
-                  - switch.turn_off: relay_b
-
   # Physical A — instant single with quick-tap guard
   - platform: gpio
     id: button_a
