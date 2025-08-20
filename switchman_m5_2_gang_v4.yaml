@@ -4,7 +4,7 @@ substitutions:
   device_ip: ""
   device_make: "Sonoff"
   device_model: "Switchman M5 (2-Gang)"
-  package_version: "4.0.2"
+  package_version: "4.0.3"
 
   api_key: !secret api_key
   wifi_ssid: !secret wifi_ssid
@@ -228,6 +228,17 @@ globals:
     restore_value: no
     initial_value: '0'
 
+  # --- NEW: suppression flags to avoid duplicate HA calls during mirrors ---
+  - id: suppress_actions_a
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+
+  - id: suppress_actions_b
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+
 text_sensor:
   - platform: wifi_info
     ip_address:
@@ -378,13 +389,17 @@ switch:
           condition:
             lambda: 'return id(mode_a).state == std::string("Coupled") && id(button_a_state).state == false;'
           then:
+            - lambda: 'id(suppress_actions_a) = true;'
             - switch.turn_on: button_a_state
+            - lambda: 'id(suppress_actions_a) = false;'
     on_turn_off:
       - if:
           condition:
             lambda: 'return id(mode_a).state == std::string("Coupled") && id(button_a_state).state == true;'
           then:
+            - lambda: 'id(suppress_actions_a) = true;'
             - switch.turn_off: button_a_state
+            - lambda: 'id(suppress_actions_a) = false;'
 
   # Relay B — keep quiet (no HA calls here)
   - platform: gpio
@@ -398,26 +413,29 @@ switch:
           condition:
             lambda: 'return id(mode_b).state == std::string("Coupled") && id(button_b_state).state == false;'
           then:
+            - lambda: 'id(suppress_actions_b) = true;'
             - switch.turn_on: button_b_state
+            - lambda: 'id(suppress_actions_b) = false;'
     on_turn_off:
       - switch.turn_off: led_indicator
       - if:
           condition:
             lambda: 'return id(mode_b).state == std::string("Coupled") && id(button_b_state).state == true;'
           then:
+            - lambda: 'id(suppress_actions_b) = true;'
             - switch.turn_off: button_b_state
+            - lambda: 'id(suppress_actions_b) = false;'
 
-  # Button A state (virtual)
+  # Button A state (virtual) — now calls HA actions in ALL modes unless suppressed
   - platform: template
     name: "Button A state"
     id: button_a_state
     optimistic: true
     restore_mode: RESTORE_DEFAULT_OFF
     on_turn_on:
-      # Only call HA action when DECOUPLED
       - if:
           condition:
-            lambda: 'return id(mode_a).state == std::string("Decoupled");'
+            lambda: 'return !id(suppress_actions_a);'
           then:
             - script.execute: a_on_action
       # Mirror to Relay A in Coupled
@@ -427,10 +445,9 @@ switch:
           then:
             - switch.turn_on: relay_a
     on_turn_off:
-      # Only call HA action when DECOUPLED
       - if:
           condition:
-            lambda: 'return id(mode_a).state == std::string("Decoupled");'
+            lambda: 'return !id(suppress_actions_a);'
           then:
             - script.execute: a_off_action
       # Mirror to Relay A in Coupled
@@ -440,7 +457,7 @@ switch:
           then:
             - switch.turn_off: relay_a
 
-  # Button B state (virtual)
+  # Button B state (virtual) — now calls HA actions in ALL modes unless suppressed
   - platform: template
     name: "Button B state"
     id: button_b_state
@@ -450,7 +467,7 @@ switch:
       - switch.turn_on: led_indicator
       - if:
           condition:
-            lambda: 'return id(mode_b).state == std::string("Decoupled");'
+            lambda: 'return !id(suppress_actions_b);'
           then:
             - script.execute: b_on_action
       - if:
@@ -462,7 +479,7 @@ switch:
       - switch.turn_off: led_indicator
       - if:
           condition:
-            lambda: 'return id(mode_b).state == std::string("Decoupled");'
+            lambda: 'return !id(suppress_actions_b);'
           then:
             - script.execute: b_off_action
       - if:
