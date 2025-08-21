@@ -4,7 +4,7 @@ substitutions:
   device_ip: ""
   device_make: "Sonoff"
   device_model: "Switchman M5 (1-Gang)"
-  package_version: "4.1.0" # Updated version number
+  package_version: "4.1.1"
 
   api_key: !secret api_key
   wifi_ssid: !secret wifi_ssid
@@ -24,7 +24,7 @@ substitutions:
   filter_delay_on: 50ms
   filter_delay_off: 50ms
 
-  # Double & hold timings
+  # Double & hold timings (single is instant via on_press)
   timing_double_click_1: ON for at most 300ms
   timing_double_click_2: OFF for at most 200ms
   timing_double_click_3: ON for at most 300ms
@@ -37,7 +37,7 @@ substitutions:
   default_relay_a_target_mode: "Off"      # "On" or "Off" when HA/API is available
   min_toggle_interval_ms: "250"           # ignore extra presses faster than this
 
-  # HA service wiring
+  # HA service wiring (leave empty to do nothing)
   button_a_on_service: ""
   button_a_on_entity: ""
   button_a_off_service: ""
@@ -62,7 +62,7 @@ esphome:
       then:
         - if:
             condition:
-              lambda: 'return id(mode_a).state == "Coupled";'
+              lambda: 'return id(mode_a).state == std::string("Coupled");'
             then:
               - if:
                   condition:
@@ -98,7 +98,7 @@ wifi:
     then:
       - if:
           condition:
-            lambda: 'return id(mode_a).state != "Coupled";'
+            lambda: 'return id(mode_a).state != std::string("Coupled");'
           then:
             - logger.log: "Wi-Fi lost -> preemptively entering fallback (Coupled)"
             - select.set:
@@ -119,7 +119,7 @@ api:
           option: "${default_mode_a}"
       - if:
           condition:
-            lambda: 'return id(relay_a_target_mode).state == "On";'
+            lambda: 'return id(relay_a_target_mode).state == std::string("On");'
           then:
             - switch.turn_on: relay_a
           else:
@@ -187,19 +187,24 @@ sensor:
     update_interval: 60s
     entity_category: "diagnostic"
     internal: true
-    on_value:
-      - text_sensor.template.publish:
-          id: uptime_human
-          state: !lambda |-
-            time_t uptime = id(sensor_uptime).state;
-            char buffer[64];
-            sprintf(buffer, "%dd %dh %dm %ds",
-              (int)(uptime / 86400),
-              (int)((uptime % 86400) / 3600),
-              (int)((uptime % 3600) / 60),
-              (int)(uptime % 60)
-            );
-            return {buffer};
+    on_raw_value:
+      then:
+        - text_sensor.template.publish:
+            id: uptime_human
+            state: !lambda |-
+              int seconds = round(id(sensor_uptime).raw_state);
+              int days = seconds / (24 * 3600);
+              seconds %= 24 * 3600;
+              int hours = seconds / 3600;
+              seconds %= 3600;
+              int minutes = seconds / 60;
+              seconds %= 60;
+              return (
+                (days ? String(days) + "d " : "") +
+                (hours ? String(hours) + "h " : "") +
+                (minutes ? String(minutes) + "m " : "") +
+                (String(seconds) + "s")
+              ).c_str();
 
   - platform: template
     id: esp_memory
@@ -222,7 +227,8 @@ sensor:
     accuracy_decimals: 0
     unit_of_measurement: MHz
     disabled_by_default: true
-    lambda: return (id(cpu_speed));
+    lambda: |-
+      return (id(cpu_speed));
     entity_category: diagnostic
 
   - platform: wifi_signal
@@ -237,6 +243,19 @@ button:
     id: button_restart
     icon: mdi:power-cycle
     entity_category: "diagnostic"
+
+  # Virtual gestures
+  - platform: template
+    name: "Button A double click action"
+    id: button_a_sim_double
+    on_press:
+      - script.execute: a_double_action
+
+  - platform: template
+    name: "Button A hold action"
+    id: button_a_sim_hold
+    on_press:
+      - script.execute: a_hold_action
 
 output:
   - platform: ledc
@@ -261,6 +280,7 @@ light:
     pin:
       number: ${led_status_gpio}
       inverted: true
+      ignore_strapping_warning: true
     restore_mode: RESTORE_DEFAULT_ON
 
 switch:
@@ -277,16 +297,18 @@ switch:
     restore_mode: RESTORE_DEFAULT_OFF
     on_turn_on:
       - switch.turn_on: led_indicator
+      # Do NOT trigger HA services here to avoid feedback loops
       - if:
           condition:
-            lambda: 'return id(mode_a).state == "Coupled" && !id(button_a_state).state;'
+            lambda: 'return id(mode_a).state == std::string("Coupled") && id(button_a_state).state == false;'
           then:
             - switch.turn_on: button_a_state
     on_turn_off:
       - switch.turn_off: led_indicator
+      # Do NOT trigger HA services here to avoid feedback loops
       - if:
           condition:
-            lambda: 'return id(mode_a).state == "Coupled" && id(button_a_state).state;'
+            lambda: 'return id(mode_a).state == std::string("Coupled") && id(button_a_state).state == true;'
           then:
             - switch.turn_off: button_a_state
 
@@ -299,24 +321,24 @@ switch:
       - switch.turn_on: led_indicator
       - if:
           condition:
-            lambda: 'return id(mode_a).state == "Decoupled";'
+            lambda: 'return id(mode_a).state == std::string("Decoupled");'
           then:
             - script.execute: a_on_action
       - if:
           condition:
-            lambda: 'return id(mode_a).state == "Coupled" && !id(relay_a).state;'
+            lambda: 'return id(mode_a).state == std::string("Coupled") && id(relay_a).state == false;'
           then:
             - switch.turn_on: relay_a
     on_turn_off:
       - switch.turn_off: led_indicator
       - if:
           condition:
-            lambda: 'return id(mode_a).state == "Decoupled";'
+            lambda: 'return id(mode_a).state == std::string("Decoupled");'
           then:
             - script.execute: a_off_action
       - if:
           condition:
-            lambda: 'return id(mode_a).state == "Coupled" && id(relay_a).state;'
+            lambda: 'return id(mode_a).state == std::string("Coupled") && id(relay_a).state == true;'
           then:
             - switch.turn_off: relay_a
 
@@ -332,6 +354,7 @@ select:
     initial_option: ${default_mode_a}
     entity_category: config
 
+  # Exposed selector that defines the enforced relay state when API is connected
   - platform: template
     id: relay_a_target_mode
     name: "Relay A target mode"
@@ -350,13 +373,16 @@ select:
             then:
               - if:
                   condition:
-                    lambda: 'return id(relay_a_target_mode).state == "On";'
+                    lambda: 'return id(relay_a_target_mode).state == std::string("On");'
                   then:
                     - switch.turn_on: relay_a
                   else:
                     - switch.turn_off: relay_a
 
+number: []
+
 binary_sensor:
+  # Physical A — INSTANT single via on_press (with quick-tap guard)
   - platform: gpio
     id: button_a
     internal: true
@@ -375,23 +401,36 @@ binary_sensor:
           then:
             - lambda: 'id(last_user_toggle_ms) = millis();'
             - if:
-                # This condition handles Coupled mode and API/Wi-Fi disconnection (failover)
                 condition:
-                  lambda: 'return id(mode_a).state == "Coupled" || !global_api_server->is_connected();'
+                  lambda: |-
+                    const bool connected = global_api_server->is_connected();
+                    const bool coupled = (id(mode_a).state == std::string("Coupled"));
+                    const bool decoupled_failover = !connected && (id(mode_a).state == std::string("Decoupled"));
+                    return coupled || decoupled_failover;
                 then:
-                  # In Coupled mode, a press ONLY toggles the local relay.
+                  # In Coupled (or failover), toggle relay and fire on/off action based on resulting state
+                  - if:
+                      condition:
+                        lambda: 'return id(relay_a).state == false;'
+                      then:
+                        - script.execute: a_on_action
+                      else:
+                        - script.execute: a_off_action
                   - switch.toggle: relay_a
                 else:
-                  # In Decoupled mode, a press toggles the virtual button state, which triggers the HA service.
+                  # In Decoupled with API, toggle button state (triggers a_*_action)
                   - switch.toggle: button_a_state
     on_multi_click:
+      # Double click
       - timing:
           - ${timing_double_click_1}
           - ${timing_double_click_2}
           - ${timing_double_click_3}
           - ${timing_double_click_4}
         then:
+          - button.press: button_a_sim_double
           - script.execute: a_double_action
+      # Hold (repeat)
       - timing:
           - ${timing_hold}
         then:
@@ -400,6 +439,7 @@ binary_sensor:
                 binary_sensor.is_on: button_a
               then:
                 - light.toggle: led_status
+                - button.press: button_a_sim_hold
                 - script.execute: a_hold_action
                 - delay: ${timing_hold_repeat}
           - light.turn_off: led_status
