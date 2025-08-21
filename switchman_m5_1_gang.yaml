@@ -1,40 +1,80 @@
 substitutions:
-  device_friendly_name: "X light switch"
-  device_name: "x-light-switch"
-  #device_ip: "0.0.0.0"
+  device_friendly_name: ""
+  device_name: ""
+  device_ip: ""
   device_make: "Sonoff"
   device_model: "Switchman M5 (1-Gang)"
-  package_version: "1.0.1"
+  package_version: "4.1.0" # Updated version number
 
-  button_a_gpio: GPIO00           # Button A
-  relay_a_gpio: GPIO23            # Relay A
-  led_indicator_gpio: GPIO19      # Red LED
-  led_status_gpio: GPIO05         # Blue LED
-  led_pwm_output_gpio: GPIO18     # LED PWM output
+  api_key: !secret api_key
+  wifi_ssid: !secret wifi_ssid
+  wifi_password: !secret wifi_password
+  ota_password: !secret ota_password
+  ap_password: !secret ap_password
+
+  button_a_gpio: GPIO00
+  relay_a_gpio: GPIO23
+  led_indicator_gpio: GPIO19
+  led_status_gpio: GPIO05
+  led_pwm_output_gpio: GPIO18
 
   log_level: INFO
   timezone: "Europe/Tallinn"
 
-  # Button timing configurations
   filter_delay_on: 50ms
   filter_delay_off: 50ms
 
-  # # Single Click Timings
-  timing_click_1: ON for at most 500ms
-  timing_click_2: OFF for at least 100ms
-  
-  # Double Click Timings
-  timing_double_click_1: ON for at most 500ms
-  timing_double_click_2: OFF for at most 400ms
-  timing_double_click_3: ON for at most 500ms
-  timing_double_click_4: OFF for at least 250ms
+  # Double & hold timings
+  timing_double_click_1: ON for at most 300ms
+  timing_double_click_2: OFF for at most 200ms
+  timing_double_click_3: ON for at most 300ms
+  timing_double_click_4: OFF for at least 120ms
 
-  # Button Hold Timings
   timing_hold: ON for at least 1s
   timing_hold_repeat: 500ms
 
-  # Pulse Timings
-  timing_pulse: 250ms
+  default_mode_a: "Coupled"               # Coupled | Decoupled
+  default_relay_a_target_mode: "Off"      # "On" or "Off" when HA/API is available
+  min_toggle_interval_ms: "250"           # ignore extra presses faster than this
+
+  # HA service wiring
+  button_a_on_service: ""
+  button_a_on_entity: ""
+  button_a_off_service: ""
+  button_a_off_entity: ""
+  button_a_double_service: ""
+  button_a_double_entity: ""
+  button_a_hold_service: ""
+  button_a_hold_entity: ""
+
+esphome:
+  name: "${device_name}"
+  friendly_name: "${device_friendly_name}"
+  comment: "${device_model} by ${device_make} version ${package_version}"
+  name_add_mac_suffix: false
+  on_boot:
+    - priority: 900.0
+      then:
+        - lambda: |-
+            id(cpu_speed) = ESP.getCpuFreqMHz();
+    # Sync relay <-> button state in Coupled on boot
+    - priority: 600.0
+      then:
+        - if:
+            condition:
+              lambda: 'return id(mode_a).state == "Coupled";'
+            then:
+              - if:
+                  condition:
+                    lambda: 'return id(button_a_state).state != id(relay_a).state;'
+                  then:
+                    - if:
+                        condition:
+                          lambda: 'return id(button_a_state).state;'
+                        then:
+                          - switch.turn_on: relay_a
+                        else:
+                          - switch.turn_off: relay_a
 
 esp32:
   board: esp32dev
@@ -42,43 +82,70 @@ esp32:
     type: arduino
     version: recommended
 
-esphome:
-  name: "${device_name}"
-  friendly_name: "${device_friendly_name}"
-  comment: "${device_model} by ${device_make} version ${package_version}"
-  name_add_mac_suffix: false
-  min_version: "0.0.1"
-  project:
-    name: "${device_make}.${device_model}"
-    version: "${package_version}"
-  on_boot:
-  - priority: 900.0
-    then:
-      - lambda: |-
-          id(cpu_speed) = ESP.getCpuFreqMHz();
-
 logger:
-  # Enable logging via network and disable serial port
   level: "${log_level}"
   baud_rate: 0
-
-globals:
-  # Define a global variable for CPU speed
-  - id: cpu_speed
-    type: int
-    restore_value: no
-    initial_value: "0"
 
 wifi:
   fast_connect: false
   power_save_mode: none
-  ssid: "${wifi_ssid}"
-  password: "${wifi_password}"
-  #use_address: "${device_ip}"
-
+  ssid: ${wifi_ssid}
+  password: ${wifi_password}
   ap:
-    ssid: "${device_name}"
-    password: "${ap_password}"
+    ssid: ${device_name}
+    password: ${ap_password}
+  on_disconnect:
+    then:
+      - if:
+          condition:
+            lambda: 'return id(mode_a).state != "Coupled";'
+          then:
+            - logger.log: "Wi-Fi lost -> preemptively entering fallback (Coupled)"
+            - select.set:
+                id: mode_a
+                option: "Coupled"
+
+ota:
+  - platform: esphome
+    password: ${ota_password}
+
+api:
+  on_client_connected:
+    then:
+      - logger.log: "API connected -> leaving fallback and restoring defaults"
+      - light.turn_off: led_status
+      - select.set:
+          id: mode_a
+          option: "${default_mode_a}"
+      - if:
+          condition:
+            lambda: 'return id(relay_a_target_mode).state == "On";'
+          then:
+            - switch.turn_on: relay_a
+          else:
+            - switch.turn_off: relay_a
+
+  on_client_disconnected:
+    then:
+      - logger.log: "API disconnected -> entering fallback (Coupled) and resyncing with button"
+      - light.turn_on: led_status
+      - select.set:
+          id: mode_a
+          option: "Coupled"
+      - if:
+          condition:
+            lambda: 'return id(button_a_state).state != id(relay_a).state;'
+          then:
+            - if:
+                condition:
+                  lambda: 'return id(button_a_state).state;'
+                then:
+                  - switch.turn_on: relay_a
+                else:
+                  - switch.turn_off: relay_a
+
+web_server:
+  port: 80
 
 time:
   - platform: sntp
@@ -87,16 +154,16 @@ time:
 
 captive_portal:
 
-web_server:
-  port: 80
+globals:
+  - id: cpu_speed
+    type: int
+    restore_value: no
+    initial_value: "0"
 
-api:
-  #encryption:
-    #key: "${api_key}"
-
-ota:
-  safe_mode: true
-  password: "${ota_password}"
+  - id: last_user_toggle_ms
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
 
 text_sensor:
   - platform: wifi_info
@@ -114,33 +181,26 @@ text_sensor:
     disabled_by_default: true
 
 sensor:
-  # Captures the uptime and updates the human-readable text sensor displayed. This is an internal sensor only.
   - platform: uptime
-    name: "Uptime"
+    name: "Uptime (s)"
     id: sensor_uptime
     update_interval: 60s
     entity_category: "diagnostic"
     internal: true
-    on_raw_value:
-      then:
-        - text_sensor.template.publish:
-            id: uptime_human
-            state: !lambda |-
-              int seconds = round(id(sensor_uptime).raw_state);
-              int days = seconds / (24 * 3600);
-              seconds = seconds % (24 * 3600);
-              int hours = seconds / 3600;
-              seconds = seconds % 3600;
-              int minutes = seconds /  60;
-              seconds = seconds % 60;
-              return (
-                (days ? String(days) + "d " : "") +
-                (hours ? String(hours) + "h " : "") +
-                (minutes ? String(minutes) + "m " : "") +
-                (String(seconds) + "s")
-              ).c_str();
+    on_value:
+      - text_sensor.template.publish:
+          id: uptime_human
+          state: !lambda |-
+            time_t uptime = id(sensor_uptime).state;
+            char buffer[64];
+            sprintf(buffer, "%dd %dh %dm %ds",
+              (int)(uptime / 86400),
+              (int)((uptime % 86400) / 3600),
+              (int)((uptime % 3600) / 60),
+              (int)(uptime % 60)
+            );
+            return {buffer};
 
-    # Device Memory
   - platform: template
     id: esp_memory
     icon: mdi:memory
@@ -153,18 +213,16 @@ sensor:
 
   - platform: internal_temperature
     name: "Internal Temperature"
-    disabled_by_default: true
     icon: mdi:heat-wave
+    disabled_by_default: true
 
-    # Device CPU Frequency
   - platform: template
     name: "CPU Frequency"
     icon: "mdi:speedometer"
     accuracy_decimals: 0
-    unit_of_measurement: Mhz
+    unit_of_measurement: MHz
     disabled_by_default: true
-    lambda: |-
-      return (id(cpu_speed));
+    lambda: return (id(cpu_speed));
     entity_category: diagnostic
 
   - platform: wifi_signal
@@ -180,207 +238,160 @@ button:
     icon: mdi:power-cycle
     entity_category: "diagnostic"
 
-  # Provide a button to reset all defined flash settings.
-  - platform: factory_reset
-    disabled_by_default: false
-    name: "Load Factory Settings"
-    id: factory_reset_all
-    icon: mdi:factory
-
-  - platform: template
-    name: "Button A double click action"
-    id: "button_a_double_click_action"
-    on_press:
-      - homeassistant.event:
-          event: esphome.switchman_m5
-          data:
-            button: A
-            action: double_click
-      - logger.log: "Button A double click action received from Home Assistant"
-
-  - platform: template
-    name: "Button A hold action"
-    id: "button_a_hold_action"
-    on_press:
-      - homeassistant.event:
-          event: esphome.switchman_m5
-          data:
-            button: A
-            action: hold
-      - logger.log: "Button A hold action received from Home Assistant"
-
-switch:
-  # Physical indicator of the relay
-  - platform: gpio
-    name: "LED indicator"
-    id: led_indicator
-    pin: ${led_indicator_gpio}
-
-  # Physical GPIO Relay
-  - platform: gpio
-    name: "Relay A"
-    pin: ${relay_a_gpio}
-    id: relay_a
-    restore_mode: RESTORE_DEFAULT_OFF
-    on_turn_on:
-    - switch.turn_on: button_a_state
-    on_turn_off:
-    - switch.turn_off: button_a_state
-
-  - platform: template
-    name: "Button A state"
-    id: button_a_state
-    optimistic: true #?
-    on_turn_on: 
-      - homeassistant.event:
-          event: esphome.switchman_m5
-          data:
-            button: A
-            action: switch_on
-      - switch.turn_on: led_indicator
-    on_turn_off: 
-      - homeassistant.event:
-          event: esphome.switchman_m5
-          data:
-            button: A
-            action: switch_off
-      - switch.turn_off: led_indicator
-
-select:
-    # Config-only select for operation mode
-  - platform: template
-    name: "Mode - Button A"
-    id: mode_a
-    icon: 'mdi:link-box-outline'
-    entity_category: 'config'
-    options:
-      - "Latching"    # 0
-      - "Momentary"   # 1
-      - "Pulse"       # 2
-      - "Decoupled"   # 3
-    initial_option: "Latching"
-    restore_value: true
-    optimistic: true
-    set_action:
-      - switch.turn_off: relay_a
-
 output:
-  # Physical GPIO PWM for off-state background brightness
-  # This pin controls the background brightness for all LEDs
-  # physically attached to the relays
   - platform: ledc
     id: pwm_output
     pin: ${led_pwm_output_gpio}
     frequency: 1000 Hz
 
 light:
-  # HA UI connection to the background brightness (PWM) pin
   - platform: monochromatic
     output: pwm_output
     name: "Red LED"
+    id: red_led_backlight
+    internal: true
     restore_mode: RESTORE_DEFAULT_OFF
     icon: 'mdi:led-outline'
     entity_category: 'config'
-  
-  # Physical pin to the connection status LED (internal)
+
   - platform: status_led
     name: "Blue LED"
     id: led_status
+    internal: true
     pin:
       number: ${led_status_gpio}
       inverted: true
-      ignore_strapping_warning: true
-    # internal: true
     restore_mode: RESTORE_DEFAULT_ON
 
-binary_sensor:
-  # Make the status LED blink when not connected/trying to connect
-  - platform: template
-    name: "API connected"
-    id: sensor_api_connected
-    internal: true
-    entity_category: 'diagnostic'
-    device_class: 'connectivity'
-    lambda: return global_api_server->is_connected();
-    on_press:
-      - light.turn_off: led_status
-    on_release:
-      - light.turn_on: led_status
-
-  # Diagnostic sensor for connection
-  - platform: status
-    name: "API Status"
-    id: sensor_status
-    disabled_by_default: true
-
-  # Physical Button A
+switch:
   - platform: gpio
-    name: "Button A"
+    name: "LED indicator"
+    id: led_indicator
+    internal: true
+    pin: ${led_indicator_gpio}
+
+  - platform: gpio
+    name: "Relay A"
+    id: relay_a
+    pin: ${relay_a_gpio}
+    restore_mode: RESTORE_DEFAULT_OFF
+    on_turn_on:
+      - switch.turn_on: led_indicator
+      - if:
+          condition:
+            lambda: 'return id(mode_a).state == "Coupled" && !id(button_a_state).state;'
+          then:
+            - switch.turn_on: button_a_state
+    on_turn_off:
+      - switch.turn_off: led_indicator
+      - if:
+          condition:
+            lambda: 'return id(mode_a).state == "Coupled" && id(button_a_state).state;'
+          then:
+            - switch.turn_off: button_a_state
+
+  - platform: template
+    name: "Button A state"
+    id: button_a_state
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    on_turn_on:
+      - switch.turn_on: led_indicator
+      - if:
+          condition:
+            lambda: 'return id(mode_a).state == "Decoupled";'
+          then:
+            - script.execute: a_on_action
+      - if:
+          condition:
+            lambda: 'return id(mode_a).state == "Coupled" && !id(relay_a).state;'
+          then:
+            - switch.turn_on: relay_a
+    on_turn_off:
+      - switch.turn_off: led_indicator
+      - if:
+          condition:
+            lambda: 'return id(mode_a).state == "Decoupled";'
+          then:
+            - script.execute: a_off_action
+      - if:
+          condition:
+            lambda: 'return id(mode_a).state == "Coupled" && id(relay_a).state;'
+          then:
+            - switch.turn_off: relay_a
+
+select:
+  - platform: template
+    id: mode_a
+    name: "Button A mode"
+    options:
+      - "Coupled"
+      - "Decoupled"
+    optimistic: true
+    restore_value: true
+    initial_option: ${default_mode_a}
+    entity_category: config
+
+  - platform: template
+    id: relay_a_target_mode
+    name: "Relay A target mode"
+    options:
+      - "On"
+      - "Off"
+    optimistic: true
+    restore_value: true
+    initial_option: ${default_relay_a_target_mode}
+    entity_category: config
+    on_value:
+      then:
+        - if:
+            condition:
+              lambda: 'return global_api_server->is_connected();'
+            then:
+              - if:
+                  condition:
+                    lambda: 'return id(relay_a_target_mode).state == "On";'
+                  then:
+                    - switch.turn_on: relay_a
+                  else:
+                    - switch.turn_off: relay_a
+
+binary_sensor:
+  - platform: gpio
     id: button_a
-    pin: 
+    internal: true
+    pin:
       number: ${button_a_gpio}
       mode: INPUT_PULLUP
       inverted: true
       ignore_strapping_warning: true
-
     filters:
       - delayed_on: ${filter_delay_on}
       - delayed_off: ${filter_delay_off}
-    
     on_press:
       - if:
           condition:
-            - lambda: 'return id(mode_a).active_index() == 0;' # Latching
+            lambda: 'return (millis() - id(last_user_toggle_ms)) >= (uint32_t) ${min_toggle_interval_ms};'
           then:
-            - switch.toggle: relay_a
-      - if:
-          condition:
-            - lambda: 'return id(mode_a).active_index() == 1;' # Momentary
-          then:
-            - switch.turn_on: relay_a
-      - if:
-          condition:
-            - lambda: 'return id(mode_a).active_index() == 2;' # Pulse
-          then:
-            - switch.turn_on: relay_a
-            - delay: ${timing_pulse}
-            - switch.turn_off: relay_a
-      - if:
-          condition:
-            - lambda: 'return id(mode_a).active_index() == 3;' # Decoupled
-          then:
-            - switch.toggle: led_indicator
-            - switch.toggle: button_a_state
-  
-    on_release:
-      - if:
-          condition:
-            - lambda: 'return id(mode_a).active_index() == 1;' # Momentary
-          then:
-            - switch.turn_off: relay_a
-
+            - lambda: 'id(last_user_toggle_ms) = millis();'
+            - if:
+                # This condition handles Coupled mode and API/Wi-Fi disconnection (failover)
+                condition:
+                  lambda: 'return id(mode_a).state == "Coupled" || !global_api_server->is_connected();'
+                then:
+                  # In Coupled mode, a press ONLY toggles the local relay.
+                  - switch.toggle: relay_a
+                else:
+                  # In Decoupled mode, a press toggles the virtual button state, which triggers the HA service.
+                  - switch.toggle: button_a_state
     on_multi_click:
-      # single click detection
-      # - timing:
-      #   - ${timing_click_1}
-      #   - ${timing_click_2}
-      #   then:
-      #     - homeassistant.event:
-      #         event: esphome.switchman_m5
-      #         data:
-      #           button: A
-      #           action: single_click
-
-      # double click detection
       - timing:
           - ${timing_double_click_1}
           - ${timing_double_click_2}
           - ${timing_double_click_3}
           - ${timing_double_click_4}
         then:
-          - button.press: button_a_double_click_action
-
-      # hold detection
+          - script.execute: a_double_action
       - timing:
           - ${timing_hold}
         then:
@@ -389,6 +400,51 @@ binary_sensor:
                 binary_sensor.is_on: button_a
               then:
                 - light.toggle: led_status
-                - button.press: button_a_hold_action
+                - script.execute: a_hold_action
                 - delay: ${timing_hold_repeat}
           - light.turn_off: led_status
+
+script:
+  - id: a_on_action
+    then:
+      - if:
+          condition:
+            lambda: 'return std::string("${button_a_on_service}") != "" && std::string("${button_a_on_entity}") != "";'
+          then:
+            - homeassistant.service:
+                service: "${button_a_on_service}"
+                data:
+                  entity_id: "${button_a_on_entity}"
+
+  - id: a_off_action
+    then:
+      - if:
+          condition:
+            lambda: 'return std::string("${button_a_off_service}") != "" && std::string("${button_a_off_entity}") != "";'
+          then:
+            - homeassistant.service:
+                service: "${button_a_off_service}"
+                data:
+                  entity_id: "${button_a_off_entity}"
+
+  - id: a_double_action
+    then:
+      - if:
+          condition:
+            lambda: 'return std::string("${button_a_double_service}") != "" && std::string("${button_a_double_entity}") != "";'
+          then:
+            - homeassistant.service:
+                service: "${button_a_double_service}"
+                data:
+                  entity_id: "${button_a_double_entity}"
+
+  - id: a_hold_action
+    then:
+      - if:
+          condition:
+            lambda: 'return std::string("${button_a_hold_service}") != "" && std::string("${button_a_hold_entity}") != "";'
+          then:
+            - homeassistant.service:
+                service: "${button_a_hold_service}"
+                data:
+                  entity_id: "${button_a_hold_entity}"
