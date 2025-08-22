@@ -10,6 +10,25 @@ substitutions so each device can be configured with a small "mini" file.
 - Placeholder secrets and linting defaults for safer configuration management
 - GitHub Actions workflow to lint and validate the YAML templates on push
 
+## Behaviour
+
+### Button and relay interaction
+
+- Each channel exposes a virtual button state (`button_a_state` / `button_b_state`) that can be decoupled from its physical relay.
+- In **Coupled** mode a button press toggles the relay and keeps the virtual state in sync.
+- In **Decoupled** mode a button press only flips the virtual state and fires the Home‑Assistant actions while the relay remains unchanged.
+
+### Blue status LED
+
+- The blue LED is dedicated to **Button A**. It lights whenever `button_a_state` is on or Relay A energises.
+- In Coupled mode Relay A updates `button_a_state`, keeping the LED aligned with the relay.
+- In Decoupled mode the LED follows `button_a_state` only, allowing the relay to stay on while the LED is off (or vice versa).
+- Button B currently has no blue LED indicator.
+
+### Fail‑safe behaviour
+
+- Losing Wi‑Fi or the API forces both buttons back to Coupled mode and resynchronises the relays with the virtual states so the LED reflects the actual relay state.
+
 ## Usage
 Create a per-device YAML that defines the required substitutions and pulls in the
 appropriate template via `packages`. Example for the 1‑gang version:
