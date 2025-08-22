@@ -374,12 +374,14 @@ switch:
     pin: ${relay_a_gpio}
     restore_mode: RESTORE_DEFAULT_OFF
     on_turn_on:
+      - light.turn_on: led_status
       - if:
           condition:
             lambda: 'return id(mode_a).state == std::string("Coupled") && id(button_a_state).state == false;'
           then:
             - switch.turn_on: button_a_state
     on_turn_off:
+      - light.turn_off: led_status
       - if:
           condition:
             lambda: 'return id(mode_a).state == std::string("Coupled") && id(button_a_state).state == true;'
@@ -414,6 +416,7 @@ switch:
     optimistic: true
     restore_mode: RESTORE_DEFAULT_OFF
     on_turn_on:
+      - light.turn_on: led_status
       # Only call HA action when DECOUPLED
       - if:
           condition:
@@ -427,6 +430,7 @@ switch:
           then:
             - switch.turn_on: relay_a
     on_turn_off:
+      - light.turn_off: led_status
       # Only call HA action when DECOUPLED
       - if:
           condition:
