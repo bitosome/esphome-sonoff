@@ -1,6 +1,6 @@
 substitutions:
-  device_friendly_name: ""
-  device_name: ""
+  device_friendly_name: "Switchman M5 2G"
+  device_name: "switchman-m5-2g"
   device_ip: ""
   device_make: "Sonoff"
   device_model: "Switchman M5 (2-Gang)"
@@ -215,17 +215,17 @@ captive_portal:
 globals:
   - id: cpu_speed
     type: int
-    restore_value: no
+    restore_value: false
     initial_value: "0"
 
   # Per-channel quick-tap guards
   - id: last_user_toggle_ms_a
     type: uint32_t
-    restore_value: no
+    restore_value: false
     initial_value: '0'
   - id: last_user_toggle_ms_b
     type: uint32_t
-    restore_value: no
+    restore_value: false
     initial_value: '0'
 
 text_sensor:
@@ -493,6 +493,27 @@ select:
     restore_value: true
     initial_option: ${default_mode_b}
     entity_category: config
+    on_value:
+      then:
+        - if:
+            condition:
+              lambda: 'return id(mode_b).state == std::string("Decoupled");'
+            then:
+              - if:
+                  condition:
+                    switch.is_on: button_b_state
+                  then:
+                    - switch.turn_on: led_indicator
+                  else:
+                    - switch.turn_off: led_indicator
+            else:
+              - if:
+                  condition:
+                    switch.is_on: relay_b
+                  then:
+                    - switch.turn_on: led_indicator
+                  else:
+                    - switch.turn_off: led_indicator
 
   # Connected target modes
   - platform: template
