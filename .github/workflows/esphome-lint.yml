@@ -1,0 +1,25 @@
+name: ESPHome Lint
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Install dependencies
+        run: |
+          pip install esphome yamllint
+      - name: Prepare secrets
+        run: cp secrets.yaml.example secrets.yaml
+      - name: Lint YAML
+        run: yamllint switchman_m5_1_gang.yaml switchman_m5_2_gang.yaml
+      - name: Validate configs
+        run: |
+          esphome config switchman_m5_1_gang.yaml
+          esphome config switchman_m5_2_gang.yaml
