@@ -26,8 +26,8 @@ substitutions:
   filter_delay_off: 50ms
 
   # Click timings
-  timing_single_click_1: ON for at most 200ms
-  timing_single_click_2: OFF for at least 120ms
+  timing_single_click_1: ON for at most 100ms
+  timing_single_click_2: OFF for at least 50ms
 
   timing_double_click_1: ON for at most 200ms
   timing_double_click_2: OFF for at most 160ms
