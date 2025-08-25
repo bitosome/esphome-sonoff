@@ -25,14 +25,11 @@ substitutions:
   filter_delay_on: 50ms
   filter_delay_off: 50ms
 
-  # Click timings
-  timing_single_click_1: ON for at most 100ms
-  timing_single_click_2: OFF for at least 50ms
-
-  timing_double_click_1: ON for at most 200ms
-  timing_double_click_2: OFF for at most 160ms
-  timing_double_click_3: ON for at most 200ms
-  timing_double_click_4: OFF for at least 80ms
+  # Double & hold timings (single is instant via on_press)
+  timing_double_click_1: ON for at most 300ms
+  timing_double_click_2: OFF for at most 200ms
+  timing_double_click_3: ON for at most 300ms
+  timing_double_click_4: OFF for at least 120ms
 
   timing_hold: ON for at least 1s
   timing_hold_repeat: 500ms
@@ -142,12 +139,6 @@ globals:
     type: int
     restore_value: false
     initial_value: "0"
-
-  # Group quick-tap guard
-  - id: last_group_toggle_ms
-    type: uint32_t
-    restore_value: false
-    initial_value: '0'
 
   # Per-channel quick-tap guards
   - id: last_user_toggle_ms_a
@@ -494,7 +485,7 @@ select:
 number: []
 
 binary_sensor:
-  # Physical A — single/double/hold handling with quick-tap guard
+  # Physical A — instant single with quick-tap guard
   - platform: gpio
     id: button_a
     internal: true
@@ -506,8 +497,29 @@ binary_sensor:
     filters:
       - delayed_on: ${filter_delay_on}
       - delayed_off: ${filter_delay_off}
+    on_press:
+      - if:
+          condition:
+            lambda: 'return (millis() - id(last_user_toggle_ms_a)) >= (uint32_t) ${min_toggle_interval_ms};'
+          then:
+            - lambda: 'id(last_user_toggle_ms_a) = millis();'
+            - if:
+                condition:
+                  lambda: 'return id(mode_a).state == std::string("Coupled");'
+                then:
+                  # In Coupled, toggle relay and fire HA action based on resulting state
+                  - if:
+                      condition:
+                        lambda: 'return id(relay_a).state == false;'
+                      then:
+                        - script.execute: a_on_action
+                      else:
+                        - script.execute: a_off_action
+                  - switch.toggle: relay_a
+                else:
+                  # In Decoupled, toggle virtual state (triggers a_*_action)
+                  - switch.toggle: button_a_state
     on_multi_click:
-      # Double click
       - timing:
           - ${timing_double_click_1}
           - ${timing_double_click_2}
@@ -516,7 +528,6 @@ binary_sensor:
         then:
           - button.press: button_a_sim_double
           - script.execute: a_double_press
-      # Hold (repeat)
       - timing:
           - ${timing_hold}
         then:
@@ -529,40 +540,8 @@ binary_sensor:
                 - script.execute: a_hold_press
                 - delay: ${timing_hold_repeat}
           - light.turn_off: led_status
-      # Single click
-      - timing:
-          - ${timing_single_click_1}
-          - ${timing_single_click_2}
-        then:
-          - if:
-              condition:
-                lambda: 'return (millis() - id(last_group_toggle_ms)) >= (uint32_t) ${min_toggle_interval_ms};'
-              then:
-                - if:
-                    condition:
-                      lambda: 'return (millis() - id(last_user_toggle_ms_a)) >= (uint32_t) ${min_toggle_interval_ms};'
-                    then:
-                      - lambda: |-
-                          id(last_user_toggle_ms_a) = millis();
-                          id(last_group_toggle_ms) = id(last_user_toggle_ms_a);
-                      - if:
-                          condition:
-                            lambda: 'return id(mode_a).state == std::string("Coupled");'
-                          then:
-                            # In Coupled, toggle relay and fire HA action based on resulting state
-                            - if:
-                                condition:
-                                  lambda: 'return id(relay_a).state == false;'
-                                then:
-                                  - script.execute: a_on_action
-                                else:
-                                  - script.execute: a_off_action
-                            - switch.toggle: relay_a
-                          else:
-                            # In Decoupled, toggle virtual state (triggers a_*_action)
-                            - switch.toggle: button_a_state
 
-  # Physical B — single/double/hold handling with quick-tap guard
+  # Physical B — instant single with quick-tap guard
   - platform: gpio
     id: button_b
     internal: true
@@ -574,8 +553,29 @@ binary_sensor:
     filters:
       - delayed_on: ${filter_delay_on}
       - delayed_off: ${filter_delay_off}
+    on_press:
+      - if:
+          condition:
+            lambda: 'return (millis() - id(last_user_toggle_ms_b)) >= (uint32_t) ${min_toggle_interval_ms};'
+          then:
+            - lambda: 'id(last_user_toggle_ms_b) = millis();'
+            - if:
+                condition:
+                  lambda: 'return id(mode_b).state == std::string("Coupled");'
+                then:
+                  # In Coupled, toggle relay and fire HA action based on resulting state
+                  - if:
+                      condition:
+                        lambda: 'return id(relay_b).state == false;'
+                      then:
+                        - script.execute: b_on_action
+                      else:
+                        - script.execute: b_off_action
+                  - switch.toggle: relay_b
+                else:
+                  # In Decoupled, toggle virtual state (triggers b_*_action)
+                  - switch.toggle: button_b_state
     on_multi_click:
-      # Double click
       - timing:
           - ${timing_double_click_1}
           - ${timing_double_click_2}
@@ -584,7 +584,6 @@ binary_sensor:
         then:
           - button.press: button_b_sim_double
           - script.execute: b_double_press
-      # Hold (repeat)
       - timing:
           - ${timing_hold}
         then:
@@ -597,38 +596,6 @@ binary_sensor:
                 - script.execute: b_hold_press
                 - delay: ${timing_hold_repeat}
           - light.turn_off: led_status
-      # Single click
-      - timing:
-          - ${timing_single_click_1}
-          - ${timing_single_click_2}
-        then:
-          - if:
-              condition:
-                lambda: 'return (millis() - id(last_group_toggle_ms)) >= (uint32_t) ${min_toggle_interval_ms};'
-              then:
-                - if:
-                    condition:
-                      lambda: 'return (millis() - id(last_user_toggle_ms_b)) >= (uint32_t) ${min_toggle_interval_ms};'
-                    then:
-                      - lambda: |-
-                          id(last_user_toggle_ms_b) = millis();
-                          id(last_group_toggle_ms) = id(last_user_toggle_ms_b);
-                      - if:
-                          condition:
-                            lambda: 'return id(mode_b).state == std::string("Coupled");'
-                          then:
-                            # In Coupled, toggle relay and fire HA action based on resulting state
-                            - if:
-                                condition:
-                                  lambda: 'return id(relay_b).state == false;'
-                                then:
-                                  - script.execute: b_on_action
-                                else:
-                                  - script.execute: b_off_action
-                            - switch.toggle: relay_b
-                          else:
-                            # In Decoupled, toggle virtual state (triggers b_*_action)
-                            - switch.toggle: button_b_state
 
 script:
   # A actions
