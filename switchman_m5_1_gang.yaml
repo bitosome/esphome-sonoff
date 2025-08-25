@@ -34,7 +34,7 @@ substitutions:
   timing_hold_repeat: 500ms
 
   default_mode_a: "Coupled"               # Coupled | Decoupled
-  default_relay_a_target_mode: "Off"      # "On" or "Off" when HA/API is available
+  default_relay_a_target_mode: "Off"      # "On" or "Off"
   min_toggle_interval_ms: "250"           # ignore extra presses faster than this
 
   # HA service wiring (leave empty to do nothing)
@@ -94,55 +94,12 @@ wifi:
   ap:
     ssid: ${device_name}
     password: ${ap_password}
-  on_disconnect:
-    then:
-      - if:
-          condition:
-            lambda: 'return id(mode_a).state != std::string("Coupled");'
-          then:
-            - logger.log: "Wi-Fi lost -> preemptively entering fallback (Coupled)"
-            - select.set:
-                id: mode_a
-                option: "Coupled"
 
 ota:
   - platform: esphome
     password: ${ota_password}
 
 api:
-  on_client_connected:
-    then:
-      - logger.log: "API connected -> leaving fallback and restoring defaults"
-      - light.turn_off: led_status
-      - select.set:
-          id: mode_a
-          option: "${default_mode_a}"
-      - if:
-          condition:
-            lambda: 'return id(relay_a_target_mode).state == std::string("On");'
-          then:
-            - switch.turn_on: relay_a
-          else:
-            - switch.turn_off: relay_a
-
-  on_client_disconnected:
-    then:
-      - logger.log: "API disconnected -> entering fallback (Coupled) and resyncing with button"
-      - light.turn_on: led_status
-      - select.set:
-          id: mode_a
-          option: "Coupled"
-      - if:
-          condition:
-            lambda: 'return id(button_a_state).state != id(relay_a).state;'
-          then:
-            - if:
-                condition:
-                  lambda: 'return id(button_a_state).state;'
-                then:
-                  - switch.turn_on: relay_a
-                else:
-                  - switch.turn_off: relay_a
 
 web_server:
   port: 80
@@ -375,7 +332,7 @@ select:
                   else:
                     - switch.turn_off: led_indicator
 
-  # Exposed selector that defines the enforced relay state when API is connected
+  # Exposed selector that defines the relay state target
   - platform: template
     id: relay_a_target_mode
     name: "Relay A target mode"
@@ -390,15 +347,11 @@ select:
       then:
         - if:
             condition:
-              lambda: 'return global_api_server->is_connected();'
+              lambda: 'return id(relay_a_target_mode).state == std::string("On");'
             then:
-              - if:
-                  condition:
-                    lambda: 'return id(relay_a_target_mode).state == std::string("On");'
-                  then:
-                    - switch.turn_on: relay_a
-                  else:
-                    - switch.turn_off: relay_a
+              - switch.turn_on: relay_a
+            else:
+              - switch.turn_off: relay_a
 
 number: []
 
@@ -423,13 +376,9 @@ binary_sensor:
             - lambda: 'id(last_user_toggle_ms) = millis();'
             - if:
                 condition:
-                  lambda: |-
-                    const bool connected = global_api_server->is_connected();
-                    const bool coupled = (id(mode_a).state == std::string("Coupled"));
-                    const bool decoupled_failover = !connected && (id(mode_a).state == std::string("Decoupled"));
-                    return coupled || decoupled_failover;
+                  lambda: 'return id(mode_a).state == std::string("Coupled");'
                 then:
-                  # In Coupled (or failover), toggle relay and fire on/off action based on resulting state
+                  # In Coupled mode, toggle relay and fire on/off action based on resulting state
                   - if:
                       condition:
                         lambda: 'return id(relay_a).state == false;'
@@ -439,7 +388,7 @@ binary_sensor:
                         - script.execute: a_off_action
                   - switch.toggle: relay_a
                 else:
-                  # In Decoupled with API, toggle button state (triggers a_*_action)
+                  # In Decoupled mode, toggle button state (triggers a_*_action)
                   - switch.toggle: button_a_state
     on_multi_click:
       # Double click
