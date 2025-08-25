@@ -530,37 +530,11 @@ binary_sensor:
                 - delay: ${timing_hold_repeat}
           - light.turn_off: led_status
       # Single click
-      - timing:
-          - ${timing_single_click_1}
-          - ${timing_single_click_2}
-        then:
-          - if:
-              condition:
-                lambda: 'return (millis() - id(last_group_toggle_ms)) >= (uint32_t) ${min_toggle_interval_ms};'
-              then:
-                - if:
-                    condition:
-                      lambda: 'return (millis() - id(last_user_toggle_ms_a)) >= (uint32_t) ${min_toggle_interval_ms};'
-                    then:
-                      - lambda: |-
-                          id(last_user_toggle_ms_a) = millis();
-                          id(last_group_toggle_ms) = id(last_user_toggle_ms_a);
-                      - if:
-                          condition:
-                            lambda: 'return id(mode_a).state == std::string("Coupled");'
-                          then:
-                            # In Coupled, toggle relay and fire HA action based on resulting state
-                            - if:
-                                condition:
-                                  lambda: 'return id(relay_a).state == false;'
-                                then:
-                                  - script.execute: a_on_action
-                                else:
-                                  - script.execute: a_off_action
-                            - switch.toggle: relay_a
-                          else:
-                            # In Decoupled, toggle virtual state (triggers a_*_action)
-                            - switch.toggle: button_a_state
+        - timing:
+            - ${timing_single_click_1}
+            - ${timing_single_click_2}
+          then:
+            - script.execute: a_press
 
   # Physical B — single/double/hold handling with quick-tap guard
   - platform: gpio
@@ -598,40 +572,43 @@ binary_sensor:
                 - delay: ${timing_hold_repeat}
           - light.turn_off: led_status
       # Single click
-      - timing:
-          - ${timing_single_click_1}
-          - ${timing_single_click_2}
-        then:
-          - if:
-              condition:
-                lambda: 'return (millis() - id(last_group_toggle_ms)) >= (uint32_t) ${min_toggle_interval_ms};'
-              then:
-                - if:
-                    condition:
-                      lambda: 'return (millis() - id(last_user_toggle_ms_b)) >= (uint32_t) ${min_toggle_interval_ms};'
-                    then:
-                      - lambda: |-
-                          id(last_user_toggle_ms_b) = millis();
-                          id(last_group_toggle_ms) = id(last_user_toggle_ms_b);
-                      - if:
-                          condition:
-                            lambda: 'return id(mode_b).state == std::string("Coupled");'
-                          then:
-                            # In Coupled, toggle relay and fire HA action based on resulting state
-                            - if:
-                                condition:
-                                  lambda: 'return id(relay_b).state == false;'
-                                then:
-                                  - script.execute: b_on_action
-                                else:
-                                  - script.execute: b_off_action
-                            - switch.toggle: relay_b
-                          else:
-                            # In Decoupled, toggle virtual state (triggers b_*_action)
-                            - switch.toggle: button_b_state
+        - timing:
+            - ${timing_single_click_1}
+            - ${timing_single_click_2}
+          then:
+            - script.execute: b_press
 
 script:
   # A actions
+  - id: a_press
+    then:
+      - if:
+          condition:
+            lambda: 'return (millis() - id(last_group_toggle_ms)) >= (uint32_t) ${min_toggle_interval_ms};'
+          then:
+            - if:
+                condition:
+                  lambda: 'return (millis() - id(last_user_toggle_ms_a)) >= (uint32_t) ${min_toggle_interval_ms};'
+                then:
+                  - lambda: |-
+                      id(last_user_toggle_ms_a) = millis();
+                      id(last_group_toggle_ms) = id(last_user_toggle_ms_a);
+                  - if:
+                      condition:
+                        lambda: 'return id(mode_a).state == std::string("Coupled");'
+                      then:
+                        # In Coupled, toggle relay and fire HA action based on resulting state
+                        - if:
+                            condition:
+                              lambda: 'return id(relay_a).state == false;'
+                            then:
+                              - script.execute: a_on_action
+                            else:
+                              - script.execute: a_off_action
+                        - switch.toggle: relay_a
+                      else:
+                        # In Decoupled, toggle virtual state (triggers a_*_action)
+                        - switch.toggle: button_a_state
   - id: a_on_action
     then:
       - if:
@@ -677,6 +654,35 @@ script:
                   entity_id: "${button_a_hold_entity}"
 
   # B actions
+  - id: b_press
+    then:
+      - if:
+          condition:
+            lambda: 'return (millis() - id(last_group_toggle_ms)) >= (uint32_t) ${min_toggle_interval_ms};'
+          then:
+            - if:
+                condition:
+                  lambda: 'return (millis() - id(last_user_toggle_ms_b)) >= (uint32_t) ${min_toggle_interval_ms};'
+                then:
+                  - lambda: |-
+                      id(last_user_toggle_ms_b) = millis();
+                      id(last_group_toggle_ms) = id(last_user_toggle_ms_b);
+                  - if:
+                      condition:
+                        lambda: 'return id(mode_b).state == std::string("Coupled");'
+                      then:
+                        # In Coupled, toggle relay and fire HA action based on resulting state
+                        - if:
+                            condition:
+                              lambda: 'return id(relay_b).state == false;'
+                            then:
+                              - script.execute: b_on_action
+                            else:
+                              - script.execute: b_off_action
+                        - switch.toggle: relay_b
+                      else:
+                        # In Decoupled, toggle virtual state (triggers b_*_action)
+                        - switch.toggle: button_b_state
   - id: b_on_action
     then:
       - if:
