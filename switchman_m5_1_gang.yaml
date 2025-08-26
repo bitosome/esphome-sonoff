@@ -403,7 +403,6 @@ script:
           condition:
             lambda: 'return (millis() - id(last_user_toggle_ms)) >= (uint32_t) ${min_toggle_interval_ms};'
           then:
-            - lambda: 'id(last_user_toggle_ms) = millis();'
             - if:
                 condition:
                   lambda: 'return id(mode_a).state == std::string("Coupled");'
@@ -420,6 +419,19 @@ script:
                   - switch.template.publish:
                       id: button_a_state
                       state: !lambda 'return !id(button_a_state).state;'
+          else:
+            - if:
+                condition:
+                  lambda: 'return id(mode_a).state == std::string("Coupled");'
+                then:
+                  - switch.template.publish:
+                      id: button_a_state
+                      state: !lambda 'return id(relay_a).state;'
+                else:
+                  - switch.template.publish:
+                      id: button_a_state
+                      state: !lambda 'return !id(button_a_state).state;'
+      - lambda: 'id(last_user_toggle_ms) = millis();'
 
   - id: a_on_action
     then:
