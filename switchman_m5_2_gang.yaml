@@ -580,7 +580,6 @@ script:
           condition:
             lambda: 'return (millis() - id(last_user_toggle_ms_a)) >= (uint32_t) ${min_toggle_interval_ms};'
           then:
-            - lambda: 'id(last_user_toggle_ms_a) = millis();'
             - if:
                 condition:
                   lambda: 'return id(mode_a).state == std::string("Coupled");'
@@ -597,6 +596,19 @@ script:
                   - switch.template.publish:
                       id: button_a_state
                       state: !lambda 'return !id(button_a_state).state;'
+          else:
+            - if:
+                condition:
+                  lambda: 'return id(mode_a).state == std::string("Coupled");'
+                then:
+                  - switch.template.publish:
+                      id: button_a_state
+                      state: !lambda 'return id(relay_a).state;'
+                else:
+                  - switch.template.publish:
+                      id: button_a_state
+                      state: !lambda 'return !id(button_a_state).state;'
+      - lambda: 'id(last_user_toggle_ms_a) = millis();'
 
   - id: b_single_press
     then:
@@ -604,7 +616,6 @@ script:
           condition:
             lambda: 'return (millis() - id(last_user_toggle_ms_b)) >= (uint32_t) ${min_toggle_interval_ms};'
           then:
-            - lambda: 'id(last_user_toggle_ms_b) = millis();'
             - if:
                 condition:
                   lambda: 'return id(mode_b).state == std::string("Coupled");'
@@ -621,6 +632,19 @@ script:
                   - switch.template.publish:
                       id: button_b_state
                       state: !lambda 'return !id(button_b_state).state;'
+          else:
+            - if:
+                condition:
+                  lambda: 'return id(mode_b).state == std::string("Coupled");'
+                then:
+                  - switch.template.publish:
+                      id: button_b_state
+                      state: !lambda 'return id(relay_b).state;'
+                else:
+                  - switch.template.publish:
+                      id: button_b_state
+                      state: !lambda 'return !id(button_b_state).state;'
+      - lambda: 'id(last_user_toggle_ms_b) = millis();'
 
   # A actions
   - id: a_on_action
