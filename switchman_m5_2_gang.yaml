@@ -4,7 +4,7 @@ substitutions:
   device_ip: ""
   device_make: "Sonoff"
   device_model: "Switchman M5 (2-Gang)"
-  package_version: "5.0.0"
+  package_version: "4.1.1"
 
   api_key: !secret api_key
   wifi_ssid: !secret wifi_ssid
@@ -301,18 +301,14 @@ switch:
           condition:
             lambda: 'return id(mode_a).state == std::string("Coupled") && id(button_a_state).state == false;'
           then:
-            - switch.template.publish:
-                id: button_a_state
-                state: ON
+            - switch.turn_on: button_a_state
     on_turn_off:
       - light.turn_off: led_status
       - if:
           condition:
             lambda: 'return id(mode_a).state == std::string("Coupled") && id(button_a_state).state == true;'
           then:
-            - switch.template.publish:
-                id: button_a_state
-                state: OFF
+            - switch.turn_off: button_a_state
 
   # Relay B — keep quiet (no HA calls here)
   - platform: gpio
@@ -326,18 +322,14 @@ switch:
           condition:
             lambda: 'return id(mode_b).state == std::string("Coupled") && id(button_b_state).state == false;'
           then:
-            - switch.template.publish:
-                id: button_b_state
-                state: ON
+            - switch.turn_on: button_b_state
     on_turn_off:
       - switch.turn_off: led_indicator
       - if:
           condition:
             lambda: 'return id(mode_b).state == std::string("Coupled") && id(button_b_state).state == true;'
           then:
-            - switch.template.publish:
-                id: button_b_state
-                state: OFF
+            - switch.turn_off: button_b_state
 
   # Button A state (virtual)
   - platform: template
@@ -345,10 +337,6 @@ switch:
     id: button_a_state
     optimistic: true
     restore_mode: RESTORE_DEFAULT_OFF
-    turn_on_action:
-      - script.execute: a_single_press
-    turn_off_action:
-      - script.execute: a_single_press
     on_turn_on:
       - light.turn_on: led_status
       # Only call HA action when DECOUPLED
@@ -384,10 +372,6 @@ switch:
     id: button_b_state
     optimistic: true
     restore_mode: RESTORE_DEFAULT_OFF
-    turn_on_action:
-      - script.execute: b_single_press
-    turn_off_action:
-      - script.execute: b_single_press
     on_turn_on:
       - switch.turn_on: led_indicator
       - if:
@@ -514,7 +498,27 @@ binary_sensor:
       - delayed_on: ${filter_delay_on}
       - delayed_off: ${filter_delay_off}
     on_press:
-      - script.execute: a_single_press
+      - if:
+          condition:
+            lambda: 'return (millis() - id(last_user_toggle_ms_a)) >= (uint32_t) ${min_toggle_interval_ms};'
+          then:
+            - lambda: 'id(last_user_toggle_ms_a) = millis();'
+            - if:
+                condition:
+                  lambda: 'return id(mode_a).state == std::string("Coupled");'
+                then:
+                  # In Coupled, toggle relay and fire HA action based on resulting state
+                  - if:
+                      condition:
+                        lambda: 'return id(relay_a).state == false;'
+                      then:
+                        - script.execute: a_on_action
+                      else:
+                        - script.execute: a_off_action
+                  - switch.toggle: relay_a
+                else:
+                  # In Decoupled, toggle virtual state (triggers a_*_action)
+                  - switch.toggle: button_a_state
     on_multi_click:
       - timing:
           - ${timing_double_click_1}
@@ -550,7 +554,27 @@ binary_sensor:
       - delayed_on: ${filter_delay_on}
       - delayed_off: ${filter_delay_off}
     on_press:
-      - script.execute: b_single_press
+      - if:
+          condition:
+            lambda: 'return (millis() - id(last_user_toggle_ms_b)) >= (uint32_t) ${min_toggle_interval_ms};'
+          then:
+            - lambda: 'id(last_user_toggle_ms_b) = millis();'
+            - if:
+                condition:
+                  lambda: 'return id(mode_b).state == std::string("Coupled");'
+                then:
+                  # In Coupled, toggle relay and fire HA action based on resulting state
+                  - if:
+                      condition:
+                        lambda: 'return id(relay_b).state == false;'
+                      then:
+                        - script.execute: b_on_action
+                      else:
+                        - script.execute: b_off_action
+                  - switch.toggle: relay_b
+                else:
+                  # In Decoupled, toggle virtual state (triggers b_*_action)
+                  - switch.toggle: button_b_state
     on_multi_click:
       - timing:
           - ${timing_double_click_1}
@@ -574,78 +598,6 @@ binary_sensor:
           - light.turn_off: led_status
 
 script:
-  - id: a_single_press
-    then:
-      - if:
-          condition:
-            lambda: 'return (millis() - id(last_user_toggle_ms_a)) >= (uint32_t) ${min_toggle_interval_ms};'
-          then:
-            - if:
-                condition:
-                  lambda: 'return id(mode_a).state == std::string("Coupled");'
-                then:
-                  - if:
-                      condition:
-                        lambda: 'return id(relay_a).state == false;'
-                      then:
-                        - script.execute: a_on_action
-                      else:
-                        - script.execute: a_off_action
-                  - switch.toggle: relay_a
-                else:
-                  - switch.template.publish:
-                      id: button_a_state
-                      state: !lambda 'return !id(button_a_state).state;'
-          else:
-            - if:
-                condition:
-                  lambda: 'return id(mode_a).state == std::string("Coupled");'
-                then:
-                  - switch.template.publish:
-                      id: button_a_state
-                      state: !lambda 'return id(relay_a).state;'
-                else:
-                  - switch.template.publish:
-                      id: button_a_state
-                      state: !lambda 'return !id(button_a_state).state;'
-      - lambda: 'id(last_user_toggle_ms_a) = millis();'
-
-  - id: b_single_press
-    then:
-      - if:
-          condition:
-            lambda: 'return (millis() - id(last_user_toggle_ms_b)) >= (uint32_t) ${min_toggle_interval_ms};'
-          then:
-            - if:
-                condition:
-                  lambda: 'return id(mode_b).state == std::string("Coupled");'
-                then:
-                  - if:
-                      condition:
-                        lambda: 'return id(relay_b).state == false;'
-                      then:
-                        - script.execute: b_on_action
-                      else:
-                        - script.execute: b_off_action
-                  - switch.toggle: relay_b
-                else:
-                  - switch.template.publish:
-                      id: button_b_state
-                      state: !lambda 'return !id(button_b_state).state;'
-          else:
-            - if:
-                condition:
-                  lambda: 'return id(mode_b).state == std::string("Coupled");'
-                then:
-                  - switch.template.publish:
-                      id: button_b_state
-                      state: !lambda 'return id(relay_b).state;'
-                else:
-                  - switch.template.publish:
-                      id: button_b_state
-                      state: !lambda 'return !id(button_b_state).state;'
-      - lambda: 'id(last_user_toggle_ms_b) = millis();'
-
   # A actions
   - id: a_on_action
     then:
