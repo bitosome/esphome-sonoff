@@ -4,7 +4,7 @@ substitutions:
   device_ip: ""
   device_make: "Sonoff"
   device_model: "Switchman M5 (1-Gang)"
-  package_version: "4.1.2"
+  package_version: "4.2.0"
 
   api_key: !secret api_key
   wifi_ssid: !secret wifi_ssid
@@ -111,7 +111,23 @@ globals:
     restore_value: false
     initial_value: "0"
 
-  - id: last_user_toggle_ms
+  - id: last_user_toggle_ms_a
+    type: uint32_t
+    restore_value: false
+    initial_value: '0'
+  
+  # Script-level debouncing
+  - id: last_ha_action_ms_a
+    type: uint32_t
+    restore_value: false
+    initial_value: '0'
+  
+  # Circuit breaker protection
+  - id: toggle_count_a
+    type: int
+    restore_value: false
+    initial_value: '0'
+  - id: circuit_breaker_start_ms_a
     type: uint32_t
     restore_value: false
     initial_value: '0'
@@ -253,7 +269,7 @@ switch:
           condition:
             and:
               - lambda: 'return id(mode_a).state == std::string("Coupled") && id(button_a_state).state == false;'
-              - lambda: 'return (millis() - id(last_user_toggle_ms)) >= 100;'  # Prevent HA-initiated loops
+              - lambda: 'return (millis() - id(last_user_toggle_ms_a)) >= 100;'  # Prevent HA-initiated loops
           then:
             - switch.turn_on: button_a_state
     on_turn_off:
@@ -263,7 +279,7 @@ switch:
           condition:
             and:
               - lambda: 'return id(mode_a).state == std::string("Coupled") && id(button_a_state).state == true;'
-              - lambda: 'return (millis() - id(last_user_toggle_ms)) >= 100;'  # Prevent HA-initiated loops
+              - lambda: 'return (millis() - id(last_user_toggle_ms_a)) >= 100;'  # Prevent HA-initiated loops
           then:
             - switch.turn_off: button_a_state
 
@@ -366,29 +382,46 @@ binary_sensor:
     filters:
       - delayed_on: ${filter_delay_on}
       - delayed_off: ${filter_delay_off}
-    on_press:
-      - if:
-          condition:
-            lambda: 'return (millis() - id(last_user_toggle_ms)) >= (uint32_t) ${min_toggle_interval_ms};'
-          then:
-            - lambda: 'id(last_user_toggle_ms) = millis();'
-            - if:
-                condition:
-                  lambda: 'return id(mode_a).state == std::string("Coupled");'
-                then:
-                  # In Coupled, toggle relay and fire on/off action based on resulting state
-                  - if:
-                      condition:
-                        lambda: 'return id(relay_a).state == false;'
-                      then:
-                        - script.execute: a_on_action
-                      else:
-                        - script.execute: a_off_action
-                  - switch.toggle: relay_a
-                else:
-                  # In Decoupled, toggle button state (triggers a_*_action)
-                  - switch.toggle: button_a_state
     on_multi_click:
+      # Single click (with minimal delay for double-click detection)
+      - timing:
+          - ON for at most 300ms
+          - OFF for at least 50ms
+        then:
+          - if:
+              condition:
+                lambda: 'return (millis() - id(last_user_toggle_ms_a)) >= (uint32_t) ${min_toggle_interval_ms};'
+              then:
+                - lambda: |-
+                    id(last_user_toggle_ms_a) = millis();
+                    // Circuit breaker logic
+                    uint32_t now = millis();
+                    if ((now - id(circuit_breaker_start_ms_a)) > 5000) {
+                      // Reset counter every 5 seconds
+                      id(toggle_count_a) = 0;
+                      id(circuit_breaker_start_ms_a) = now;
+                    }
+                    id(toggle_count_a)++;
+                    if (id(toggle_count_a) > 3) {
+                      ESP_LOGW("switch", "Circuit breaker triggered for channel A - too many toggles");
+                      return; // Skip this toggle
+                    }
+                - if:
+                    condition:
+                      lambda: 'return id(mode_a).state == std::string("Coupled");'
+                    then:
+                      # In Coupled, toggle relay and fire on/off action based on resulting state
+                      - if:
+                          condition:
+                            lambda: 'return id(relay_a).state == false;'
+                          then:
+                            - script.execute: a_on_action
+                          else:
+                            - script.execute: a_off_action
+                      - switch.toggle: relay_a
+                    else:
+                      # In Decoupled, toggle button state (triggers a_*_action)
+                      - switch.toggle: button_a_state
       # Double click
       - timing:
           - ${timing_double_click_1}
@@ -417,8 +450,11 @@ script:
     then:
       - if:
           condition:
-            lambda: 'return std::string("${button_a_on_service}") != "" && std::string("${button_a_on_entity}") != "";'
+            and:
+              - lambda: 'return (millis() - id(last_ha_action_ms_a)) >= 100;'  # 100ms cooldown
+              - lambda: 'return std::string("${button_a_on_service}") != "" && std::string("${button_a_on_entity}") != "";'
           then:
+            - lambda: 'id(last_ha_action_ms_a) = millis();'
             - homeassistant.service:
                 service: "${button_a_on_service}"
                 data:
@@ -428,8 +464,11 @@ script:
     then:
       - if:
           condition:
-            lambda: 'return std::string("${button_a_off_service}") != "" && std::string("${button_a_off_entity}") != "";'
+            and:
+              - lambda: 'return (millis() - id(last_ha_action_ms_a)) >= 100;'  # 100ms cooldown
+              - lambda: 'return std::string("${button_a_off_service}") != "" && std::string("${button_a_off_entity}") != "";'
           then:
+            - lambda: 'id(last_ha_action_ms_a) = millis();'
             - homeassistant.service:
                 service: "${button_a_off_service}"
                 data:
