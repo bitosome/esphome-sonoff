@@ -4,7 +4,7 @@ substitutions:
   device_ip: ""
   device_make: "Sonoff"
   device_model: "Switchman M5 (1-Gang)"
-  package_version: "4.1.1"
+  package_version: "4.1.2"
 
   api_key: !secret api_key
   wifi_ssid: !secret wifi_ssid
@@ -251,7 +251,9 @@ switch:
       # Do NOT trigger HA services here to avoid feedback loops
       - if:
           condition:
-            lambda: 'return id(mode_a).state == std::string("Coupled") && id(button_a_state).state == false;'
+            and:
+              - lambda: 'return id(mode_a).state == std::string("Coupled") && id(button_a_state).state == false;'
+              - lambda: 'return (millis() - id(last_user_toggle_ms)) >= 100;'  # Prevent HA-initiated loops
           then:
             - switch.turn_on: button_a_state
     on_turn_off:
@@ -259,7 +261,9 @@ switch:
       # Do NOT trigger HA services here to avoid feedback loops
       - if:
           condition:
-            lambda: 'return id(mode_a).state == std::string("Coupled") && id(button_a_state).state == true;'
+            and:
+              - lambda: 'return id(mode_a).state == std::string("Coupled") && id(button_a_state).state == true;'
+              - lambda: 'return (millis() - id(last_user_toggle_ms)) >= 100;'  # Prevent HA-initiated loops
           then:
             - switch.turn_off: button_a_state
 

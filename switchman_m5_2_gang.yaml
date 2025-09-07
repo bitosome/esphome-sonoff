@@ -4,7 +4,7 @@ substitutions:
   device_ip: ""
   device_make: "Sonoff"
   device_model: "Switchman M5 (2-Gang)"
-  package_version: "4.1.1"
+  package_version: "4.1.2"
 
   api_key: !secret api_key
   wifi_ssid: !secret wifi_ssid
@@ -299,14 +299,18 @@ switch:
       - light.turn_on: led_status
       - if:
           condition:
-            lambda: 'return id(mode_a).state == std::string("Coupled") && id(button_a_state).state == false;'
+            and:
+              - lambda: 'return id(mode_a).state == std::string("Coupled") && id(button_a_state).state == false;'
+              - lambda: 'return (millis() - id(last_user_toggle_ms_a)) >= 100;'  # Prevent HA-initiated loops
           then:
             - switch.turn_on: button_a_state
     on_turn_off:
       - light.turn_off: led_status
       - if:
           condition:
-            lambda: 'return id(mode_a).state == std::string("Coupled") && id(button_a_state).state == true;'
+            and:
+              - lambda: 'return id(mode_a).state == std::string("Coupled") && id(button_a_state).state == true;'
+              - lambda: 'return (millis() - id(last_user_toggle_ms_a)) >= 100;'  # Prevent HA-initiated loops
           then:
             - switch.turn_off: button_a_state
 
@@ -320,14 +324,18 @@ switch:
       - switch.turn_on: led_indicator
       - if:
           condition:
-            lambda: 'return id(mode_b).state == std::string("Coupled") && id(button_b_state).state == false;'
+            and:
+              - lambda: 'return id(mode_b).state == std::string("Coupled") && id(button_b_state).state == false;'
+              - lambda: 'return (millis() - id(last_user_toggle_ms_b)) >= 100;'  # Prevent HA-initiated loops
           then:
             - switch.turn_on: button_b_state
     on_turn_off:
       - switch.turn_off: led_indicator
       - if:
           condition:
-            lambda: 'return id(mode_b).state == std::string("Coupled") && id(button_b_state).state == true;'
+            and:
+              - lambda: 'return id(mode_b).state == std::string("Coupled") && id(button_b_state).state == true;'
+              - lambda: 'return (millis() - id(last_user_toggle_ms_b)) >= 100;'  # Prevent HA-initiated loops
           then:
             - switch.turn_off: button_b_state
 
