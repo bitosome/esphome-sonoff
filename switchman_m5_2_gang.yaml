@@ -41,7 +41,7 @@ substitutions:
   min_toggle_interval_ms: 250             # ignore extra presses faster than this
   
   # Circuit breaker and debouncing settings
-  circuit_breaker_reset_interval: 5000ms   # reset circuit breaker counter after this time
+  circuit_breaker_reset_interval_ms: 5000  # reset circuit breaker counter after this time
   circuit_breaker_max_toggles: 3           # max toggles before circuit breaker triggers
   ha_action_cooldown_ms: 100               # cooldown between HA service calls
   relay_sync_cooldown_ms: 100              # prevent HA-initiated loops in coupled mode
@@ -567,7 +567,7 @@ binary_sensor:
                     id(last_user_toggle_ms_a) = millis();
                     // Circuit breaker logic
                     uint32_t now = millis();
-                    if ((now - id(circuit_breaker_start_ms_a)) > ${circuit_breaker_reset_interval}) {
+                    if ((now - id(circuit_breaker_start_ms_a)) > ${circuit_breaker_reset_interval_ms}) {
                       // Reset counter every 5 seconds
                       id(toggle_count_a) = 0;
                       id(circuit_breaker_start_ms_a) = now;
@@ -645,7 +645,7 @@ binary_sensor:
                     id(last_user_toggle_ms_b) = millis();
                     // Circuit breaker logic
                     uint32_t now = millis();
-                    if ((now - id(circuit_breaker_start_ms_b)) > ${circuit_breaker_reset_interval}) {
+                    if ((now - id(circuit_breaker_start_ms_b)) > ${circuit_breaker_reset_interval_ms}) {
                       // Reset counter every 5 seconds
                       id(toggle_count_b) = 0;
                       id(circuit_breaker_start_ms_b) = now;
