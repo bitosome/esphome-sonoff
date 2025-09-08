@@ -35,6 +35,12 @@ substitutions:
   default_mode_a: "Coupled"               # Coupled | Decoupled
   default_relay_a_target_mode: "Off"      # "On" or "Off" when HA/API is available
   min_toggle_interval_ms: 250              # ignore extra presses faster than this
+  
+  # Circuit breaker and debouncing settings
+  circuit_breaker_reset_interval: 5000ms   # reset circuit breaker counter after this time
+  circuit_breaker_max_toggles: 3           # max toggles before circuit breaker triggers
+  ha_action_cooldown_ms: 100               # cooldown between HA service calls
+  relay_sync_cooldown_ms: 100              # prevent HA-initiated loops in coupled mode
 
   # HA service wiring (leave empty to do nothing)
   button_a_on_service: ""
@@ -56,7 +62,8 @@ esphome:
       then:
         - lambda: |-
             id(cpu_speed) = ESP.getCpuFreqMHz();
-    # Sync relay <-> button state in Coupled on boot
+    # Boot sequence: Sync relay <-> button state when in Coupled mode
+    # This ensures physical relay matches virtual button state after restart
     - priority: 600.0
       then:
         - if:
@@ -96,6 +103,8 @@ ota:
     password: ${ota_password}
 
 api:
+  encryption:
+    key: ${api_key}
 
 web_server:
   port: 80
@@ -211,7 +220,8 @@ button:
     icon: mdi:power-cycle
     entity_category: "diagnostic"
 
-  # Virtual gestures
+  # Virtual gesture buttons for HA integration
+  # These trigger the same actions as physical multi-click/hold gestures
   - platform: template
     name: "Button A double click action"
     id: button_a_sim_double
@@ -257,56 +267,65 @@ switch:
     internal: true
     pin: ${led_indicator_gpio}
 
+  # Physical relay A - controls actual load switching
+  # Syncs with virtual button state in Coupled mode
   - platform: gpio
     name: "Relay A"
     id: relay_a
     pin: ${relay_a_gpio}
     restore_mode: RESTORE_DEFAULT_OFF
     on_turn_on:
-      - switch.turn_on: led_indicator
-      # Do NOT trigger HA services here to avoid feedback loops
+      - switch.turn_on: led_indicator  # Always sync LED with relay
+      # Prevent feedback loops: only sync button state if this was user-initiated
       - if:
           condition:
             and:
               - lambda: 'return id(mode_a).state == std::string("Coupled") && id(button_a_state).state == false;'
-              - lambda: 'return (millis() - id(last_user_toggle_ms_a)) >= 100;'  # Prevent HA-initiated loops
+              - lambda: 'return (millis() - id(last_user_toggle_ms_a)) >= ${relay_sync_cooldown_ms};'  # Anti-loop protection
           then:
-            - switch.turn_on: button_a_state
+            - switch.turn_on: button_a_state  # Sync virtual state
     on_turn_off:
-      - switch.turn_off: led_indicator
-      # Do NOT trigger HA services here to avoid feedback loops
+      - switch.turn_off: led_indicator  # Always sync LED with relay
+      # Prevent feedback loops: only sync button state if this was user-initiated
       - if:
           condition:
             and:
               - lambda: 'return id(mode_a).state == std::string("Coupled") && id(button_a_state).state == true;'
-              - lambda: 'return (millis() - id(last_user_toggle_ms_a)) >= 100;'  # Prevent HA-initiated loops
+              - lambda: 'return (millis() - id(last_user_toggle_ms_a)) >= ${relay_sync_cooldown_ms};'  # Anti-loop protection
           then:
-            - switch.turn_off: button_a_state
+            - switch.turn_off: button_a_state  # Sync virtual state
 
+  # Virtual button A state - represents logical switch state
+  # In Decoupled mode: independent of physical relay, only triggers HA actions
+  # In Coupled mode: bidirectionally synced with physical relay
   - platform: template
     name: "Button A state"
     id: button_a_state
     optimistic: true
     restore_mode: RESTORE_DEFAULT_OFF
     on_turn_on:
-      - switch.turn_on: led_indicator
+      - switch.turn_on: led_indicator  # Always sync LED indicator
+      # Decoupled mode: trigger HA action only (relay stays independent)
       - if:
           condition:
             lambda: 'return id(mode_a).state == std::string("Decoupled");'
           then:
             - script.execute: a_on_action
+      # Coupled mode: mirror state to physical relay
       - if:
           condition:
             lambda: 'return id(mode_a).state == std::string("Coupled") && id(relay_a).state == false;'
           then:
             - switch.turn_on: relay_a
     on_turn_off:
-      - switch.turn_off: led_indicator
+      - switch.turn_off: led_indicator  # Always sync LED indicator
+      # Decoupled mode: trigger HA action only (relay stays independent)
       - if:
           condition:
             lambda: 'return id(mode_a).state == std::string("Decoupled");'
           then:
             - script.execute: a_off_action
+      # Coupled mode: mirror state to physical relay
       - if:
           condition:
             lambda: 'return id(mode_a).state == std::string("Coupled") && id(relay_a).state == true;'
@@ -370,7 +389,10 @@ select:
 number: []
 
 binary_sensor:
-  # Physical A — INSTANT single via on_press (with quick-tap guard)
+  # Physical button A with multi-click detection
+  # - Single click: immediate toggle with debouncing
+  # - Double click: custom HA action
+  # - Hold: repeating custom HA action with LED feedback
   - platform: gpio
     id: button_a
     internal: true
@@ -388,29 +410,34 @@ binary_sensor:
           - ON for at most 300ms
           - OFF for at least 50ms
         then:
+          # Anti-bounce protection: prevent rapid toggling
           - if:
               condition:
                 lambda: 'return (millis() - id(last_user_toggle_ms_a)) >= (uint32_t) ${min_toggle_interval_ms};'
               then:
+                # Circuit breaker: prevent relay damage from excessive switching
                 - lambda: |-
                     id(last_user_toggle_ms_a) = millis();
-                    // Circuit breaker logic
+                    // Circuit breaker logic - track toggles over time window
                     uint32_t now = millis();
-                    if ((now - id(circuit_breaker_start_ms_a)) > 5000) {
-                      // Reset counter every 5 seconds
+                    if ((now - id(circuit_breaker_start_ms_a)) > ${circuit_breaker_reset_interval}) {
+                      // Reset counter after time window expires
                       id(toggle_count_a) = 0;
                       id(circuit_breaker_start_ms_a) = now;
                     }
                     id(toggle_count_a)++;
-                    if (id(toggle_count_a) > 3) {
+                    if (id(toggle_count_a) > ${circuit_breaker_max_toggles}) {
                       ESP_LOGW("switch", "Circuit breaker triggered for channel A - too many toggles");
-                      return; // Skip this toggle
+                      return; // Skip this toggle to protect relay
                     }
+                # Mode-dependent behavior:
+                # COUPLED: Physical button controls both relay and HA actions
+                # DECOUPLED: Physical button only controls HA actions, relay independent
                 - if:
                     condition:
                       lambda: 'return id(mode_a).state == std::string("Coupled");'
                     then:
-                      # In Coupled, toggle relay and fire on/off action based on resulting state
+                      # Coupled mode: toggle relay and trigger HA action based on new state
                       - if:
                           condition:
                             lambda: 'return id(relay_a).state == false;'
@@ -420,7 +447,7 @@ binary_sensor:
                             - script.execute: a_off_action
                       - switch.toggle: relay_a
                     else:
-                      # In Decoupled, toggle button state (triggers a_*_action)
+                      # Decoupled mode: only toggle virtual state (triggers HA actions)
                       - switch.toggle: button_a_state
       # Double click
       - timing:
@@ -445,12 +472,14 @@ binary_sensor:
           - light.turn_off: led_status
 
 script:
+  # Home Assistant service integration scripts
+  # These handle cooldown logic to prevent excessive API calls
   - id: a_on_action
     then:
       - if:
           condition:
             and:
-              - lambda: 'return (millis() - id(last_ha_action_ms_a)) >= 100;'  # 100ms cooldown
+              - lambda: 'return (millis() - id(last_ha_action_ms_a)) >= ${ha_action_cooldown_ms};'  # HA service cooldown
               - lambda: 'return std::string("${button_a_on_service}") != "" && std::string("${button_a_on_entity}") != "";'
           then:
             - lambda: 'id(last_ha_action_ms_a) = millis();'
@@ -464,7 +493,7 @@ script:
       - if:
           condition:
             and:
-              - lambda: 'return (millis() - id(last_ha_action_ms_a)) >= 100;'  # 100ms cooldown
+              - lambda: 'return (millis() - id(last_ha_action_ms_a)) >= ${ha_action_cooldown_ms};'  # HA service cooldown
               - lambda: 'return std::string("${button_a_off_service}") != "" && std::string("${button_a_off_entity}") != "";'
           then:
             - lambda: 'id(last_ha_action_ms_a) = millis();'
@@ -473,6 +502,7 @@ script:
                 data:
                   entity_id: "${button_a_off_entity}"
 
+  # Double-click gesture: calls HA service without cooldown (less frequent)
   - id: a_double_action
     then:
       - if:
@@ -484,6 +514,7 @@ script:
                 data:
                   entity_id: "${button_a_double_entity}"
 
+  # Hold gesture: calls HA service without cooldown (repeating action)
   - id: a_hold_action
     then:
       - if:
