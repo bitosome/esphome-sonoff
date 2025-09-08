@@ -6,7 +6,6 @@ substitutions so each device can be configured with a small "mini" file.
 
 ## Features
 - Coupled/decoupled modes with automatic LED indicator synchronisation
-- Fallback to coupled mode when Wi‑Fi or API is unavailable
 - Placeholder secrets and linting defaults for safer configuration management
 - GitHub Actions workflow to lint and validate the YAML templates on push
 
@@ -18,16 +17,9 @@ substitutions so each device can be configured with a small "mini" file.
 - In **Coupled** mode a button press toggles the relay and keeps the virtual state in sync.
 - In **Decoupled** mode a button press only flips the virtual state and fires the Home‑Assistant actions while the relay remains unchanged.
 
-### Blue status LED
+### LED behaviour
 
-- The blue LED is dedicated to **Button A**. It lights whenever `button_a_state` is on or Relay A energises.
-- In Coupled mode Relay A updates `button_a_state`, keeping the LED aligned with the relay.
-- In Decoupled mode the LED follows `button_a_state` only, allowing the relay to stay on while the LED is off (or vice versa).
-- Button B currently has no blue LED indicator.
-
-### Fail‑safe behaviour
-
-- Losing Wi‑Fi or the API forces both buttons back to Coupled mode and resynchronises the relays with the virtual states so the LED reflects the actual relay state.
+- Indicator LEDs mirror the configured channel logic (Coupled vs Decoupled) per template.
 
 ## Usage
 Create a per-device YAML that defines the required substitutions and pulls in the
@@ -37,11 +29,9 @@ appropriate template via `packages`. Example for the 1‑gang version:
 substitutions:
   device_friendly_name: "Entrance light switch 1"
   device_name: "entrance-light-switch-1"
-  api_key: !secret api_key
   wifi_ssid: !secret wifi_ssid
   wifi_password: !secret wifi_password
   ota_password: !secret ota_password
-  ap_password: !secret ap_password
 
 packages:
   remote_package:
@@ -61,4 +51,3 @@ yamllint switchman_m5_1_gang.yaml switchman_m5_2_gang.yaml
 esphome config switchman_m5_1_gang.yaml
 esphome config switchman_m5_2_gang.yaml
 ```
-

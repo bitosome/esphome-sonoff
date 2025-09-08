@@ -4,7 +4,7 @@ substitutions:
   device_ip: ""
   device_make: "Sonoff"
   device_model: "Switchman M5 (2-Gang)"
-  package_version: "4.2.0"
+  package_version: "1.0.0"
 
   api_key: !secret api_key
   wifi_ssid: !secret wifi_ssid
@@ -38,7 +38,7 @@ substitutions:
   default_mode_b: "Coupled"              # "Coupled" | "Decoupled"
   default_relay_a_target_mode: "Off"     # "On" | "Off" when HA/API is available
   default_relay_b_target_mode: "Off"     # "On" | "Off" when HA/API is available
-  min_toggle_interval_ms: "250"          # ignore extra presses faster than this
+  min_toggle_interval_ms: 250             # ignore extra presses faster than this
 
   # HA actions — A
   button_a_on_service: ""
@@ -581,7 +581,7 @@ binary_sensor:
           - ${timing_double_click_4}
         then:
           - button.press: button_a_sim_double
-          - script.execute: a_double_press
+          # Only trigger via the exposed virtual button to avoid duplicate actions
       # Hold (repeat)
       - timing:
           - ${timing_hold}
@@ -592,7 +592,6 @@ binary_sensor:
               then:
                 - light.toggle: led_status
                 - button.press: button_a_sim_hold
-                - script.execute: a_hold_press
                 - delay: ${timing_hold_repeat}
           - light.turn_off: led_status
 
@@ -656,7 +655,7 @@ binary_sensor:
           - ${timing_double_click_4}
         then:
           - button.press: button_b_sim_double
-          - script.execute: b_double_press
+          # Only trigger via the exposed virtual button to avoid duplicate actions
       # Hold (repeat)
       - timing:
           - ${timing_hold}
@@ -667,7 +666,6 @@ binary_sensor:
               then:
                 - light.toggle: led_status
                 - button.press: button_b_sim_hold
-                - script.execute: b_hold_press
                 - delay: ${timing_hold_repeat}
           - light.turn_off: led_status
 
