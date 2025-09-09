@@ -4,7 +4,7 @@ substitutions:
   device_ip: ""
   device_make: "Sonoff"
   device_model: "Switchman M5 (1-Gang)"
-  package_version: "2.0.1"
+  package_version: "2.0.2"
 
   api_key: !secret api_key
   wifi_ssid: !secret wifi_ssid
@@ -34,10 +34,10 @@ substitutions:
   
   # Circuit breaker and debouncing settings
   circuit_breaker_reset_interval_ms: 5000  # reset circuit breaker counter after this time
-  circuit_breaker_max_toggles: 3           # max toggles before circuit breaker triggers
+  circuit_breaker_max_toggles: 20           # max toggles before circuit breaker triggers
   ha_action_cooldown_ms: 10               # cooldown between HA service calls (close to 0, with circuit breaker protection)
   relay_sync_cooldown_ms: 100              # prevent HA-initiated loops in coupled mode
-  feedback_loop_protection_ms: 5000        # prevent switch group feedback loops
+  feedback_loop_protection_ms: 1000        # prevent switch group feedback loops
 
   # HA service wiring (leave empty to do nothing)
   # CRITICAL: When using Home Assistant switch groups, these settings prevent feedback loops:
