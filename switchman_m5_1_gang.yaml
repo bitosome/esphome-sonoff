@@ -1,5 +1,18 @@
 substitutions:
-  device_friendly_name: "Switchman M5 1G"
+  device_friendly_name: "S  # HA service wiring (leave empty to do nothing)
+  # CRITICAL: When using Home Assistant switch groups, these settings prevent feedback loops:
+  # - ha_action_cooldown_ms: 2000ms (increased from 100ms) 
+  # - feedback_loop_protection_ms: 5000ms (blocks calls after external changes)
+  # Without proper protection, multiple switches calling the same group can cause endless flickering!
+  button_a_on_service: ""
+  button_a_on_entity: ""
+  button_a_off_service: ""
+  button_a_off_entity: ""
+  button_a_double_click_service: ""
+  button_a_double_click_entity: ""
+  # Hold removed for simplicity
+  button_a_hold_service: ""
+  button_a_hold_entity: ""1G"
   device_name: "switchman-m5-1g"
   device_ip: ""
   device_make: "Sonoff"
@@ -464,6 +477,8 @@ binary_sensor:
                   - switch.toggle: relay_a
                 else:
                   - switch.toggle: button_a_state
+    on_double_click:
+      - script.execute: a_double_click
     # Hold handled by a_hold_check script (triggered on_press)
 
 script:
@@ -537,3 +552,15 @@ script:
                 service: "${button_a_hold_service}"
                 data:
                   entity_id: "${button_a_hold_entity}"
+
+  # Double-click action
+  - id: a_double_click
+    then:
+      - if:
+          condition:
+            lambda: 'return std::string("${button_a_double_click_service}") != "" && std::string("${button_a_double_click_entity}") != "";'
+          then:
+            - homeassistant.service:
+                service: "${button_a_double_click_service}"
+                data:
+                  entity_id: "${button_a_double_click_entity}"

@@ -48,7 +48,9 @@ substitutions:
   button_a_on_entity: ""
   button_a_off_service: ""
   button_a_off_entity: ""
-  # Double-click removed — these services are unused
+  button_a_double_click_service: ""
+  button_a_double_click_entity: ""
+  # Hold removed for simplicity
   button_a_hold_service: ""
   button_a_hold_entity: ""
 
@@ -57,7 +59,9 @@ substitutions:
   button_b_on_entity: ""
   button_b_off_service: ""
   button_b_off_entity: ""
-  # Double-click removed — these services are unused
+  button_b_double_click_service: ""
+  button_b_double_click_entity: ""
+  # Hold removed for simplicity
   button_b_hold_service: ""
   button_b_hold_entity: ""
 
@@ -581,6 +585,8 @@ binary_sensor:
                   - switch.toggle: relay_a
                 else:
                   - switch.toggle: button_a_state
+    on_double_click:
+      - script.execute: a_double_click
 
   # Physical button B (Channel B)
   # - Single: instant toggle on release with protection
@@ -634,6 +640,8 @@ binary_sensor:
                   - switch.toggle: relay_b
                 else:
                   - switch.toggle: button_b_state
+    on_double_click:
+      - script.execute: b_double_click
 
 script:
   # Home Assistant service integration scripts
@@ -746,3 +754,26 @@ script:
                 service: "${button_b_hold_service}"
                 data:
                   entity_id: "${button_b_hold_entity}"
+
+  # Double-click actions
+  - id: a_double_click
+    then:
+      - if:
+          condition:
+            lambda: 'return std::string("${button_a_double_click_service}") != "" && std::string("${button_a_double_click_entity}") != "";'
+          then:
+            - homeassistant.service:
+                service: "${button_a_double_click_service}"
+                data:
+                  entity_id: "${button_a_double_click_entity}"
+
+  - id: b_double_click
+    then:
+      - if:
+          condition:
+            lambda: 'return std::string("${button_b_double_click_service}") != "" && std::string("${button_b_double_click_entity}") != "";'
+          then:
+            - homeassistant.service:
+                service: "${button_b_double_click_service}"
+                data:
+                  entity_id: "${button_b_double_click_entity}"
