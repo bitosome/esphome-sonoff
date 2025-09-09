@@ -26,10 +26,9 @@ substitutions:
   filter_delay_on: 10ms
   filter_delay_off: 10ms
 
-  # Hold timing (single is instant via on_press)
-  # Double-click removed for instant single responsiveness
-  timing_hold: ON for at least 1s
-  timing_hold_repeat: 500ms
+  # Hold timing (single is instant on release)
+  # Double-click removed; hold starts after this threshold
+  hold_start_ms: 200ms
 
   default_mode_a: "Coupled"              # "Coupled" | "Decoupled"
   default_mode_b: "Coupled"              # "Coupled" | "Decoupled"
@@ -164,6 +163,16 @@ globals:
     type: uint32_t
     restore_value: false
     initial_value: '0'
+  
+  # Hold detection flags (per channel)
+  - id: a_hold_triggered
+    type: bool
+    restore_value: false
+    initial_value: 'false'
+  - id: b_hold_triggered
+    type: bool
+    restore_value: false
+    initial_value: 'false'
   
   # Circuit breaker protection
   - id: toggle_count_a
@@ -521,10 +530,9 @@ select:
 number: []
 
 binary_sensor:
-  # Physical button A with multi-click detection (Channel A)
-  # - Single click: immediate toggle with circuit breaker protection
-  # - Double click: custom HA action
-  # - Hold: repeating custom HA action with LED feedback
+  # Physical button A (Channel A)
+  # - Single: instant toggle on release with protection
+  # - Hold: single-fire action if still pressed after hold_start_ms
   - platform: gpio
     id: button_a
     internal: true
@@ -537,10 +545,14 @@ binary_sensor:
       - delayed_on: ${filter_delay_on}
       - delayed_off: ${filter_delay_off}
     on_press:
-      # Instant single press action with protection
+      # Arm hold detection and start timer
+      - lambda: 'id(a_hold_triggered) = false;'
+      - script.execute: a_hold_check
+    on_release:
+      # Single action on release, only if hold did not fire
       - if:
           condition:
-            lambda: 'return (millis() - id(last_user_toggle_ms_a)) >= (uint32_t) ${min_toggle_interval_ms};'
+            lambda: 'return !id(a_hold_triggered) && (millis() - id(last_user_toggle_ms_a)) >= (uint32_t) ${min_toggle_interval_ms};'
           then:
             - lambda: |-
                 id(last_user_toggle_ms_a) = millis();
@@ -569,24 +581,10 @@ binary_sensor:
                   - switch.toggle: relay_a
                 else:
                   - switch.toggle: button_a_state
-    on_multi_click:
-      # Hold (repeat)
-      - timing:
-          - ${timing_hold}
-        then:
-          - while:
-              condition:
-                binary_sensor.is_on: button_a
-              then:
-                - light.toggle: led_status
-                - button.press: button_a_sim_hold
-                - delay: ${timing_hold_repeat}
-          - light.turn_off: led_status
 
-  # Physical button B with multi-click detection (Channel B)
-  # - Single click: immediate toggle with circuit breaker protection  
-  # - Double click: custom HA action
-  # - Hold: repeating custom HA action with LED feedback
+  # Physical button B (Channel B)
+  # - Single: instant toggle on release with protection
+  # - Hold: single-fire action if still pressed after hold_start_ms
   # Note: GPIO15 is a strapping pin - may affect boot if held during startup
   - platform: gpio
     id: button_b
@@ -600,10 +598,14 @@ binary_sensor:
       - delayed_on: ${filter_delay_on}
       - delayed_off: ${filter_delay_off}
     on_press:
-      # Instant single press action with protection
+      # Arm hold detection and start timer
+      - lambda: 'id(b_hold_triggered) = false;'
+      - script.execute: b_hold_check
+    on_release:
+      # Single action on release, only if hold did not fire
       - if:
           condition:
-            lambda: 'return (millis() - id(last_user_toggle_ms_b)) >= (uint32_t) ${min_toggle_interval_ms};'
+            lambda: 'return !id(b_hold_triggered) && (millis() - id(last_user_toggle_ms_b)) >= (uint32_t) ${min_toggle_interval_ms};'
           then:
             - lambda: |-
                 id(last_user_toggle_ms_b) = millis();
@@ -632,23 +634,21 @@ binary_sensor:
                   - switch.toggle: relay_b
                 else:
                   - switch.toggle: button_b_state
-    on_multi_click:
-      # Hold (repeat)
-      - timing:
-          - ${timing_hold}
-        then:
-          - while:
-              condition:
-                binary_sensor.is_on: button_b
-              then:
-                - light.toggle: led_status
-                - button.press: button_b_sim_hold
-                - delay: ${timing_hold_repeat}
-          - light.turn_off: led_status
 
 script:
   # Home Assistant service integration scripts
   # These handle cooldown logic to prevent excessive API calls
+  
+  # Hold detection (single fire): start after hold_start_ms if still pressed
+  - id: a_hold_check
+    then:
+      - delay: ${hold_start_ms}
+      - if:
+          condition:
+            binary_sensor.is_on: button_a
+          then:
+            - lambda: 'id(a_hold_triggered) = true;'
+            - button.press: button_a_sim_hold
   
   # Channel A action scripts
   - id: a_on_action
@@ -694,6 +694,17 @@ script:
                   entity_id: "${button_a_hold_entity}"
 
   # Channel B action scripts
+  
+  # Hold detection (single fire) for channel B
+  - id: b_hold_check
+    then:
+      - delay: ${hold_start_ms}
+      - if:
+          condition:
+            binary_sensor.is_on: button_b
+          then:
+            - lambda: 'id(b_hold_triggered) = true;'
+            - button.press: button_b_sim_hold
   - id: b_on_action
     then:
       - if:
