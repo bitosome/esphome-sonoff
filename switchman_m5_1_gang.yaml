@@ -4,7 +4,7 @@ substitutions:
   device_ip: ""
   device_make: "Sonoff"
   device_model: "Switchman M5 (1-Gang)"
-  package_version: "2.0.2"
+  package_version: "2.0.3"
 
   api_key: !secret api_key
   wifi_ssid: !secret wifi_ssid
