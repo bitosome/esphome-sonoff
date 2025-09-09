@@ -4,7 +4,7 @@ substitutions:
   device_ip: ""
   device_make: "Sonoff"
   device_model: "Switchman M5 (2-Gang)"
-  package_version: "2.0.0"
+  package_version: "2.0.1"
 
   api_key: !secret api_key
   wifi_ssid: !secret wifi_ssid
@@ -34,12 +34,12 @@ substitutions:
   default_mode_b: "Coupled"              # "Coupled" | "Decoupled"
   default_relay_a_target_mode: "Off"     # "On" | "Off" when HA/API is available
   default_relay_b_target_mode: "Off"     # "On" | "Off" when HA/API is available
-  min_toggle_interval_ms: 250             # ignore extra presses faster than this
+  min_toggle_interval_ms: 100             # ignore extra presses faster than this (close to 0 for human speed)
   
   # Circuit breaker and debouncing settings
   circuit_breaker_reset_interval_ms: 5000  # reset circuit breaker counter after this time
   circuit_breaker_max_toggles: 3           # max toggles before circuit breaker triggers
-  ha_action_cooldown_ms: 2000              # cooldown between HA service calls (increased for group stability)
+  ha_action_cooldown_ms: 10               # cooldown between HA service calls (close to 0, with circuit breaker protection)
   relay_sync_cooldown_ms: 100              # prevent HA-initiated loops in coupled mode
   feedback_loop_protection_ms: 5000        # prevent switch group feedback loops
 
