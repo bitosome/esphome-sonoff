@@ -24,15 +24,8 @@ substitutions:
   filter_delay_on: 10ms
   filter_delay_off: 10ms
 
-  # Multi-click timing configuration (optimized for UX)
-  # Keep single snappy while preserving reliable double detection
-  timing_single_click_off: OFF for at least 260ms
-  timing_double_click_1: ON for at most 300ms
-  timing_double_click_2: OFF for at most 250ms
-  timing_double_click_3: ON for at most 300ms
-  timing_double_click_4: OFF for at least 60ms
-
-  timing_hold: ON for at least 1s
+  # Hold timing (single is instant on release)
+  hold_start_ms: 200ms
   timing_hold_repeat: 500ms
 
   default_mode_a: "Coupled"               # Coupled | Decoupled
@@ -55,8 +48,7 @@ substitutions:
   button_a_on_entity: ""
   button_a_off_service: ""
   button_a_off_entity: ""
-  button_a_double_service: ""
-  button_a_double_entity: ""
+  # Double-click support removed for faster single press
   button_a_hold_service: ""
   button_a_hold_entity: ""
 
@@ -139,6 +131,12 @@ globals:
     restore_value: false
     initial_value: '0'
   
+  # Track whether the current press has fired a hold
+  - id: a_hold_triggered
+    type: bool
+    restore_value: false
+    initial_value: 'false'
+
   # Feedback loop protection for switch groups
   - id: last_external_change_ms_a
     type: uint32_t
@@ -233,14 +231,6 @@ button:
     id: button_restart
     icon: mdi:power-cycle
     entity_category: "diagnostic"
-
-  # Virtual gesture buttons for HA integration
-  # These trigger the same actions as physical multi-click/hold gestures
-  - platform: template
-    name: "Button A double click action"
-    id: button_a_sim_double
-    on_press:
-      - script.execute: a_double_action
 
   - platform: template
     name: "Button A hold action"
@@ -437,76 +427,59 @@ binary_sensor:
     filters:
       - delayed_on: ${filter_delay_on}
       - delayed_off: ${filter_delay_off}
-    on_multi_click:
-      # Double click first (prevents single from stealing)
-      - timing:
-          - ${timing_double_click_1}
-          - ${timing_double_click_2}
-          - ${timing_double_click_3}
-          - ${timing_double_click_4}
-        then:
-          - button.press: button_a_sim_double
-          # Only trigger via the exposed virtual button to avoid duplicate actions
-      # Hold (repeat)
-      - timing:
-          - ${timing_hold}
-        then:
-          - while:
-              condition:
-                binary_sensor.is_on: button_a
-              then:
-                - light.toggle: led_status
-                - button.press: button_a_sim_hold
-                - delay: ${timing_hold_repeat}
-          - light.turn_off: led_status
-      # Single click last (fires quickly after release, still leaves room for double)
-      - timing:
-          - ON for at most 300ms
-          - ${timing_single_click_off}
-        then:
-          # Anti-bounce protection: prevent rapid toggling
-          - if:
-              condition:
-                lambda: 'return (millis() - id(last_user_toggle_ms_a)) >= (uint32_t) ${min_toggle_interval_ms};'
-              then:
-                # Circuit breaker: prevent relay damage from excessive switching
-                - lambda: |-
-                    id(last_user_toggle_ms_a) = millis();
-                    // Circuit breaker logic - track toggles over time window
-                    uint32_t now = millis();
-                    if ((now - id(circuit_breaker_start_ms_a)) > ${circuit_breaker_reset_interval_ms}) {
-                      // Reset counter after time window expires
-                      id(toggle_count_a) = 0;
-                      id(circuit_breaker_start_ms_a) = now;
-                    }
-                    id(toggle_count_a)++;
-                    if (id(toggle_count_a) > ${circuit_breaker_max_toggles}) {
-                      ESP_LOGW("switch", "Circuit breaker triggered for channel A - too many toggles");
-                      return; // Skip this toggle to protect relay
-                    }
-                # Mode-dependent behavior - FEEDBACK LOOP PROTECTION:
-                # COUPLED: Physical button controls both relay AND HA services (with protection)  
-                # DECOUPLED: Physical button only controls HA actions (no relay)
-                - if:
-                    condition:
-                      lambda: 'return id(mode_a).state == std::string("Coupled");'
-                    then:
-                      # Coupled mode: toggle relay and call HA service (but with enhanced protection)
-                      - if:
-                          condition:
-                            lambda: 'return id(relay_a).state == false;'
-                          then:
-                            - script.execute: a_on_action
-                          else:
-                            - script.execute: a_off_action
-                      - switch.toggle: relay_a
-                    else:
-                      # Decoupled mode: only toggle virtual state (triggers HA actions)
-                      - switch.toggle: button_a_state
+    on_press:
+      # Arm hold detection and start hold timer
+      - lambda: 'id(a_hold_triggered) = false;'
+      - script.execute: a_hold_check
+    on_release:
+      # Instant single action on release, only if hold did not fire
+      - if:
+          condition:
+            lambda: 'return !id(a_hold_triggered) && (millis() - id(last_user_toggle_ms_a)) >= (uint32_t) ${min_toggle_interval_ms};'
+          then:
+            - lambda: |-
+                id(last_user_toggle_ms_a) = millis();
+                // Circuit breaker logic - track toggles over time window
+                uint32_t now = millis();
+                if ((now - id(circuit_breaker_start_ms_a)) > ${circuit_breaker_reset_interval_ms}) {
+                  id(toggle_count_a) = 0;
+                  id(circuit_breaker_start_ms_a) = now;
+                }
+                id(toggle_count_a)++;
+                if (id(toggle_count_a) > ${circuit_breaker_max_toggles}) {
+                  ESP_LOGW("switch", "Circuit breaker triggered for channel A - too many toggles");
+                  return; // Skip this toggle to protect relay
+                }
+            - if:
+                condition:
+                  lambda: 'return id(mode_a).state == std::string("Coupled");'
+                then:
+                  - if:
+                      condition:
+                        lambda: 'return id(relay_a).state == false;'
+                      then:
+                        - script.execute: a_on_action
+                      else:
+                        - script.execute: a_off_action
+                  - switch.toggle: relay_a
+                else:
+                  - switch.toggle: button_a_state
+    # Hold handled by a_hold_check script (triggered on_press)
 
 script:
   # Home Assistant service integration scripts
   # These handle cooldown logic to prevent excessive API calls
+  
+  # Hold detection (single fire): start after hold_start_ms if still pressed
+  - id: a_hold_check
+    then:
+      - delay: ${hold_start_ms}
+      - if:
+          condition:
+            binary_sensor.is_on: button_a
+          then:
+            - lambda: 'id(a_hold_triggered) = true;'
+            - button.press: button_a_sim_hold
   - id: a_on_action
     then:
       - if:
@@ -552,18 +525,6 @@ script:
           else:
             - lambda: |-
                 ESP_LOGW("ha_service", "HA service call blocked - cooldown or feedback protection active");
-
-  # Double-click gesture: calls HA service without cooldown (less frequent)
-  - id: a_double_action
-    then:
-      - if:
-          condition:
-            lambda: 'return std::string("${button_a_double_service}") != "" && std::string("${button_a_double_entity}") != "";'
-          then:
-            - homeassistant.service:
-                service: "${button_a_double_service}"
-                data:
-                  entity_id: "${button_a_double_entity}"
 
   # Hold gesture: calls HA service without cooldown (repeating action)
   - id: a_hold_action
