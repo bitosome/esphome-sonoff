@@ -4,7 +4,7 @@ substitutions:
   device_ip: ""
   device_make: "Sonoff"
   device_model: "Switchman M5 (1-Gang)"
-  package_version: "2.0.3"
+  package_version: "2.0.4"
 
   api_key: !secret api_key
   wifi_ssid: !secret wifi_ssid
@@ -520,8 +520,6 @@ script:
               - lambda: 'return (millis() - id(last_ha_action_ms_a)) >= ${ha_action_cooldown_ms};'
               # Service configuration check
               - lambda: 'return std::string("${button_a_on_service}") != "" && std::string("${button_a_on_entity}") != "";'
-              # Feedback loop protection - don't call HA if recent external change detected
-              - lambda: 'return (millis() - id(last_external_change_ms_a)) >= ${feedback_loop_protection_ms};'
           then:
             - lambda: |-
                 id(last_ha_action_ms_a) = millis();
@@ -532,7 +530,7 @@ script:
                   entity_id: "${button_a_on_entity}"
           else:
             - lambda: |-
-                ESP_LOGW("ha_service", "HA service call blocked - cooldown or feedback protection active");
+                ESP_LOGW("ha_service", "HA service call blocked - cooldown active");
 
   - id: a_off_action
     then:
@@ -543,8 +541,6 @@ script:
               - lambda: 'return (millis() - id(last_ha_action_ms_a)) >= ${ha_action_cooldown_ms};'
               # Service configuration check
               - lambda: 'return std::string("${button_a_off_service}") != "" && std::string("${button_a_off_entity}") != "";'
-              # Feedback loop protection - don't call HA if recent external change detected
-              - lambda: 'return (millis() - id(last_external_change_ms_a)) >= ${feedback_loop_protection_ms};'
           then:
             - lambda: |-
                 id(last_ha_action_ms_a) = millis();
@@ -555,7 +551,7 @@ script:
                   entity_id: "${button_a_off_entity}"
           else:
             - lambda: |-
-                ESP_LOGW("ha_service", "HA service call blocked - cooldown or feedback protection active");
+                ESP_LOGW("ha_service", "HA service call blocked - cooldown active");
 
   # Hold gesture: calls HA service without cooldown (repeating action)
   - id: a_hold_action
