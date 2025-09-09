@@ -22,15 +22,17 @@ substitutions:
   log_level: INFO
   timezone: "Europe/Tallinn"
 
-  filter_delay_on: 50ms
-  filter_delay_off: 50ms
+  # Shorter GPIO debounce to reduce perceived latency
+  filter_delay_on: 10ms
+  filter_delay_off: 10ms
 
   # Multi-click timing configuration (optimized for UX)
-  timing_single_click_off: OFF for at least 300ms   # responsive single-click delay
-  timing_double_click_1: ON for at most 250ms      # tighter double-click window
-  timing_double_click_2: OFF for at most 250ms     # faster inter-click timing  
-  timing_double_click_3: ON for at most 250ms      # consistent click duration
-  timing_double_click_4: OFF for at least 50ms     # minimal final delay
+  # Keep single snappy while preserving reliable double detection
+  timing_single_click_off: OFF for at least 260ms
+  timing_double_click_1: ON for at most 300ms
+  timing_double_click_2: OFF for at most 250ms
+  timing_double_click_3: ON for at most 300ms
+  timing_double_click_4: OFF for at least 60ms
 
   timing_hold: ON for at least 1s
   timing_hold_repeat: 500ms
@@ -559,7 +561,28 @@ binary_sensor:
       - delayed_on: ${filter_delay_on}
       - delayed_off: ${filter_delay_off}
     on_multi_click:
-      # Single click (300ms delay allows double-click detection, still responsive)
+      # Double click first (prevents single from stealing)
+      - timing:
+          - ${timing_double_click_1}
+          - ${timing_double_click_2}
+          - ${timing_double_click_3}
+          - ${timing_double_click_4}
+        then:
+          - button.press: button_a_sim_double
+          # Only trigger via the exposed virtual button to avoid duplicate actions
+      # Hold (repeat)
+      - timing:
+          - ${timing_hold}
+        then:
+          - while:
+              condition:
+                binary_sensor.is_on: button_a
+              then:
+                - light.toggle: led_status
+                - button.press: button_a_sim_hold
+                - delay: ${timing_hold_repeat}
+          - light.turn_off: led_status
+      # Single click last (fires quickly after release, still leaves room for double)
       - timing:
           - ON for at most 300ms
           - ${timing_single_click_off}
@@ -598,27 +621,6 @@ binary_sensor:
                     else:
                       # In Decoupled, toggle virtual state (triggers a_*_action)
                       - switch.toggle: button_a_state
-      # Double click
-      - timing:
-          - ${timing_double_click_1}
-          - ${timing_double_click_2}
-          - ${timing_double_click_3}
-          - ${timing_double_click_4}
-        then:
-          - button.press: button_a_sim_double
-          # Only trigger via the exposed virtual button to avoid duplicate actions
-      # Hold (repeat)
-      - timing:
-          - ${timing_hold}
-        then:
-          - while:
-              condition:
-                binary_sensor.is_on: button_a
-              then:
-                - light.toggle: led_status
-                - button.press: button_a_sim_hold
-                - delay: ${timing_hold_repeat}
-          - light.turn_off: led_status
 
   # Physical button B with multi-click detection (Channel B)
   # - Single click: immediate toggle with circuit breaker protection  
@@ -637,7 +639,28 @@ binary_sensor:
       - delayed_on: ${filter_delay_on}
       - delayed_off: ${filter_delay_off}
     on_multi_click:
-      # Single click (300ms delay allows double-click detection, still responsive)
+      # Double click first (prevents single from stealing)
+      - timing:
+          - ${timing_double_click_1}
+          - ${timing_double_click_2}
+          - ${timing_double_click_3}
+          - ${timing_double_click_4}
+        then:
+          - button.press: button_b_sim_double
+          # Only trigger via the exposed virtual button to avoid duplicate actions
+      # Hold (repeat)
+      - timing:
+          - ${timing_hold}
+        then:
+          - while:
+              condition:
+                binary_sensor.is_on: button_b
+              then:
+                - light.toggle: led_status
+                - button.press: button_b_sim_hold
+                - delay: ${timing_hold_repeat}
+          - light.turn_off: led_status
+      # Single click last (fires quickly after release, still leaves room for double)
       - timing:
           - ON for at most 300ms
           - ${timing_single_click_off}
@@ -676,27 +699,6 @@ binary_sensor:
                     else:
                       # In Decoupled, toggle virtual state (triggers b_*_action)
                       - switch.toggle: button_b_state
-      # Double click
-      - timing:
-          - ${timing_double_click_1}
-          - ${timing_double_click_2}
-          - ${timing_double_click_3}
-          - ${timing_double_click_4}
-        then:
-          - button.press: button_b_sim_double
-          # Only trigger via the exposed virtual button to avoid duplicate actions
-      # Hold (repeat)
-      - timing:
-          - ${timing_hold}
-        then:
-          - while:
-              condition:
-                binary_sensor.is_on: button_b
-              then:
-                - light.toggle: led_status
-                - button.press: button_b_sim_hold
-                - delay: ${timing_hold_repeat}
-          - light.turn_off: led_status
 
 script:
   # Home Assistant service integration scripts
