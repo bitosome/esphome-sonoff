@@ -26,14 +26,8 @@ substitutions:
   filter_delay_on: 10ms
   filter_delay_off: 10ms
 
-  # Multi-click timing configuration (optimized for UX)
-  # Keep single snappy while preserving reliable double detection
-  timing_single_click_off: OFF for at least 260ms
-  timing_double_click_1: ON for at most 300ms
-  timing_double_click_2: OFF for at most 250ms
-  timing_double_click_3: ON for at most 300ms
-  timing_double_click_4: OFF for at least 60ms
-
+  # Hold timing (single is instant via on_press)
+  # Double-click removed for instant single responsiveness
   timing_hold: ON for at least 1s
   timing_hold_repeat: 500ms
 
@@ -55,8 +49,7 @@ substitutions:
   button_a_on_entity: ""
   button_a_off_service: ""
   button_a_off_entity: ""
-  button_a_double_service: ""
-  button_a_double_entity: ""
+  # Double-click removed — these services are unused
   button_a_hold_service: ""
   button_a_hold_entity: ""
 
@@ -65,8 +58,7 @@ substitutions:
   button_b_on_entity: ""
   button_b_off_service: ""
   button_b_off_entity: ""
-  button_b_double_service: ""
-  button_b_double_entity: ""
+  # Double-click removed — these services are unused
   button_b_hold_service: ""
   button_b_hold_entity: ""
 
@@ -270,27 +262,11 @@ button:
     icon: mdi:power-cycle
     entity_category: "diagnostic"
 
-  # Virtual gesture buttons for HA integration (Channel A)
-  # These trigger the same actions as physical multi-click/hold gestures
-  - platform: template
-    name: "Button A double click action"
-    id: button_a_sim_double
-    on_press:
-      - script.execute: a_double_press
-
   - platform: template
     name: "Button A hold action"
     id: button_a_sim_hold
     on_press:
       - script.execute: a_hold_press
-
-  # Virtual gesture buttons for HA integration (Channel B)
-  # These trigger the same actions as physical multi-click/hold gestures
-  - platform: template
-    name: "Button B double click action"
-    id: button_b_sim_double
-    on_press:
-      - script.execute: b_double_press
 
   - platform: template
     name: "Button B hold action"
@@ -560,16 +536,40 @@ binary_sensor:
     filters:
       - delayed_on: ${filter_delay_on}
       - delayed_off: ${filter_delay_off}
+    on_press:
+      # Instant single press action with protection
+      - if:
+          condition:
+            lambda: 'return (millis() - id(last_user_toggle_ms_a)) >= (uint32_t) ${min_toggle_interval_ms};'
+          then:
+            - lambda: |-
+                id(last_user_toggle_ms_a) = millis();
+                // Circuit breaker logic
+                uint32_t now = millis();
+                if ((now - id(circuit_breaker_start_ms_a)) > ${circuit_breaker_reset_interval_ms}) {
+                  id(toggle_count_a) = 0;
+                  id(circuit_breaker_start_ms_a) = now;
+                }
+                id(toggle_count_a)++;
+                if (id(toggle_count_a) > ${circuit_breaker_max_toggles}) {
+                  ESP_LOGW("switch", "Circuit breaker triggered for channel A - too many toggles");
+                  return; // Skip this toggle
+                }
+            - if:
+                condition:
+                  lambda: 'return id(mode_a).state == std::string("Coupled");'
+                then:
+                  - if:
+                      condition:
+                        lambda: 'return id(relay_a).state == false;'
+                      then:
+                        - script.execute: a_on_action
+                      else:
+                        - script.execute: a_off_action
+                  - switch.toggle: relay_a
+                else:
+                  - switch.toggle: button_a_state
     on_multi_click:
-      # Double click first (prevents single from stealing)
-      - timing:
-          - ${timing_double_click_1}
-          - ${timing_double_click_2}
-          - ${timing_double_click_3}
-          - ${timing_double_click_4}
-        then:
-          - button.press: button_a_sim_double
-          # Only trigger via the exposed virtual button to avoid duplicate actions
       # Hold (repeat)
       - timing:
           - ${timing_hold}
@@ -582,45 +582,6 @@ binary_sensor:
                 - button.press: button_a_sim_hold
                 - delay: ${timing_hold_repeat}
           - light.turn_off: led_status
-      # Single click last (fires quickly after release, still leaves room for double)
-      - timing:
-          - ON for at most 300ms
-          - ${timing_single_click_off}
-        then:
-          - if:
-              condition:
-                lambda: 'return (millis() - id(last_user_toggle_ms_a)) >= (uint32_t) ${min_toggle_interval_ms};'
-              then:
-                - lambda: |-
-                    id(last_user_toggle_ms_a) = millis();
-                    // Circuit breaker logic
-                    uint32_t now = millis();
-                    if ((now - id(circuit_breaker_start_ms_a)) > ${circuit_breaker_reset_interval_ms}) {
-                      // Reset counter every 5 seconds
-                      id(toggle_count_a) = 0;
-                      id(circuit_breaker_start_ms_a) = now;
-                    }
-                    id(toggle_count_a)++;
-                    if (id(toggle_count_a) > ${circuit_breaker_max_toggles}) {
-                      ESP_LOGW("switch", "Circuit breaker triggered for channel A - too many toggles");
-                      return; // Skip this toggle
-                    }
-                - if:
-                    condition:
-                      lambda: 'return id(mode_a).state == std::string("Coupled");'
-                    then:
-                      # In Coupled, toggle relay and fire HA action based on resulting state
-                      - if:
-                          condition:
-                            lambda: 'return id(relay_a).state == false;'
-                          then:
-                            - script.execute: a_on_action
-                          else:
-                            - script.execute: a_off_action
-                      - switch.toggle: relay_a
-                    else:
-                      # In Decoupled, toggle virtual state (triggers a_*_action)
-                      - switch.toggle: button_a_state
 
   # Physical button B with multi-click detection (Channel B)
   # - Single click: immediate toggle with circuit breaker protection  
@@ -638,16 +599,40 @@ binary_sensor:
     filters:
       - delayed_on: ${filter_delay_on}
       - delayed_off: ${filter_delay_off}
+    on_press:
+      # Instant single press action with protection
+      - if:
+          condition:
+            lambda: 'return (millis() - id(last_user_toggle_ms_b)) >= (uint32_t) ${min_toggle_interval_ms};'
+          then:
+            - lambda: |-
+                id(last_user_toggle_ms_b) = millis();
+                // Circuit breaker logic
+                uint32_t now = millis();
+                if ((now - id(circuit_breaker_start_ms_b)) > ${circuit_breaker_reset_interval_ms}) {
+                  id(toggle_count_b) = 0;
+                  id(circuit_breaker_start_ms_b) = now;
+                }
+                id(toggle_count_b)++;
+                if (id(toggle_count_b) > ${circuit_breaker_max_toggles}) {
+                  ESP_LOGW("switch", "Circuit breaker triggered for channel B - too many toggles");
+                  return; // Skip this toggle
+                }
+            - if:
+                condition:
+                  lambda: 'return id(mode_b).state == std::string("Coupled");'
+                then:
+                  - if:
+                      condition:
+                        lambda: 'return id(relay_b).state == false;'
+                      then:
+                        - script.execute: b_on_action
+                      else:
+                        - script.execute: b_off_action
+                  - switch.toggle: relay_b
+                else:
+                  - switch.toggle: button_b_state
     on_multi_click:
-      # Double click first (prevents single from stealing)
-      - timing:
-          - ${timing_double_click_1}
-          - ${timing_double_click_2}
-          - ${timing_double_click_3}
-          - ${timing_double_click_4}
-        then:
-          - button.press: button_b_sim_double
-          # Only trigger via the exposed virtual button to avoid duplicate actions
       # Hold (repeat)
       - timing:
           - ${timing_hold}
@@ -660,45 +645,6 @@ binary_sensor:
                 - button.press: button_b_sim_hold
                 - delay: ${timing_hold_repeat}
           - light.turn_off: led_status
-      # Single click last (fires quickly after release, still leaves room for double)
-      - timing:
-          - ON for at most 300ms
-          - ${timing_single_click_off}
-        then:
-          - if:
-              condition:
-                lambda: 'return (millis() - id(last_user_toggle_ms_b)) >= (uint32_t) ${min_toggle_interval_ms};'
-              then:
-                - lambda: |-
-                    id(last_user_toggle_ms_b) = millis();
-                    // Circuit breaker logic
-                    uint32_t now = millis();
-                    if ((now - id(circuit_breaker_start_ms_b)) > ${circuit_breaker_reset_interval_ms}) {
-                      // Reset counter every 5 seconds
-                      id(toggle_count_b) = 0;
-                      id(circuit_breaker_start_ms_b) = now;
-                    }
-                    id(toggle_count_b)++;
-                    if (id(toggle_count_b) > ${circuit_breaker_max_toggles}) {
-                      ESP_LOGW("switch", "Circuit breaker triggered for channel B - too many toggles");
-                      return; // Skip this toggle
-                    }
-                - if:
-                    condition:
-                      lambda: 'return id(mode_b).state == std::string("Coupled");'
-                    then:
-                      # In Coupled, toggle relay and fire HA action based on resulting state
-                      - if:
-                          condition:
-                            lambda: 'return id(relay_b).state == false;'
-                          then:
-                            - script.execute: b_on_action
-                          else:
-                            - script.execute: b_off_action
-                      - switch.toggle: relay_b
-                    else:
-                      # In Decoupled, toggle virtual state (triggers b_*_action)
-                      - switch.toggle: button_b_state
 
 script:
   # Home Assistant service integration scripts
@@ -733,17 +679,7 @@ script:
                 data:
                   entity_id: "${button_a_off_entity}"
 
-  # Double-click gesture A: calls HA service without cooldown (less frequent)
-  - id: a_double_press
-    then:
-      - if:
-          condition:
-            lambda: 'return std::string("${button_a_double_service}") != "" && std::string("${button_a_double_entity}") != "";'
-          then:
-            - homeassistant.service:
-                service: "${button_a_double_service}"
-                data:
-                  entity_id: "${button_a_double_entity}"
+  # Double-click removed for channel A
 
   # Hold gesture A: calls HA service without cooldown (repeating action)
   - id: a_hold_press
@@ -786,17 +722,7 @@ script:
                 data:
                   entity_id: "${button_b_off_entity}"
 
-  # Double-click gesture B: calls HA service without cooldown (less frequent)
-  - id: b_double_press
-    then:
-      - if:
-          condition:
-            lambda: 'return std::string("${button_b_double_service}") != "" && std::string("${button_b_double_entity}") != "";'
-          then:
-            - homeassistant.service:
-                service: "${button_b_double_service}"
-                data:
-                  entity_id: "${button_b_double_entity}"
+  # Double-click removed for channel B
 
   # Hold gesture B: calls HA service without cooldown (repeating action)
   - id: b_hold_press
