@@ -470,6 +470,36 @@ script:
   # Home Assistant service integration scripts
   # These handle cooldown logic to prevent excessive API calls
   
+  # Hold blinking feedback for channel A
+  - id: a_hold_blink
+    mode: restart
+    then:
+      - while:
+          condition:
+            binary_sensor.is_on: button_a
+          then:
+            - if:
+                condition:
+                  switch.is_on: button_a_state
+                then:
+                  - switch.turn_off: led_indicator
+                  - delay: 100ms
+                  - switch.turn_on: led_indicator
+                  - delay: 100ms
+                  - switch.turn_off: led_indicator
+                  - delay: 100ms
+                  - switch.turn_on: led_indicator
+                  - delay: 500ms
+                else:
+                  - switch.turn_on: led_indicator
+                  - delay: 100ms
+                  - switch.turn_off: led_indicator
+                  - delay: 100ms
+                  - switch.turn_on: led_indicator
+                  - delay: 100ms
+                  - switch.turn_off: led_indicator
+                  - delay: 500ms
+  
   # Hold detection (single fire): start after hold_start_ms if still pressed
   - id: a_hold_check
     then:
@@ -479,6 +509,7 @@ script:
             binary_sensor.is_on: button_a
           then:
             - lambda: 'id(a_hold_triggered) = true;'
+            - script.execute: a_hold_blink
             - button.press: button_a_sim_hold
   - id: a_on_action
     then:
