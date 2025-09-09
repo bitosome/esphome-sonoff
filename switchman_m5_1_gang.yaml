@@ -482,22 +482,22 @@ script:
                 condition:
                   switch.is_on: button_a_state
                 then:
-                  - switch.turn_off: led_indicator
+                  - light.turn_off: led_status
                   - delay: 100ms
-                  - switch.turn_on: led_indicator
+                  - light.turn_on: led_status
                   - delay: 100ms
-                  - switch.turn_off: led_indicator
+                  - light.turn_off: led_status
                   - delay: 100ms
-                  - switch.turn_on: led_indicator
+                  - light.turn_on: led_status
                   - delay: 500ms
                 else:
-                  - switch.turn_on: led_indicator
+                  - light.turn_on: led_status
                   - delay: 100ms
-                  - switch.turn_off: led_indicator
+                  - light.turn_off: led_status
                   - delay: 100ms
-                  - switch.turn_on: led_indicator
+                  - light.turn_on: led_status
                   - delay: 100ms
-                  - switch.turn_off: led_indicator
+                  - light.turn_off: led_status
                   - delay: 500ms
   
   # Hold detection (single fire): start after hold_start_ms if still pressed
