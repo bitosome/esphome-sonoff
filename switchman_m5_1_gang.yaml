@@ -470,7 +470,7 @@ script:
   # Home Assistant service integration scripts
   # These handle cooldown logic to prevent excessive API calls
   
-  # Hold detection/loop: start after hold_start_ms if still pressed
+  # Hold detection (single fire): start after hold_start_ms if still pressed
   - id: a_hold_check
     then:
       - delay: ${hold_start_ms}
@@ -479,14 +479,7 @@ script:
             binary_sensor.is_on: button_a
           then:
             - lambda: 'id(a_hold_triggered) = true;'
-            - while:
-                condition:
-                  binary_sensor.is_on: button_a
-                then:
-                  - light.toggle: led_status
-                  - button.press: button_a_sim_hold
-                  - delay: ${timing_hold_repeat}
-            - light.turn_off: led_status
+            - button.press: button_a_sim_hold
   - id: a_on_action
     then:
       - if:
