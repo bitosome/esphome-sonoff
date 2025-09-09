@@ -24,8 +24,8 @@ substitutions:
   filter_delay_on: 10ms
   filter_delay_off: 10ms
 
-  # Hold timing (single is instant via on_press)
-  timing_hold: ON for at least 200ms
+  # Hold timing (single is instant on release)
+  hold_start_ms: 200ms
   timing_hold_repeat: 500ms
 
   default_mode_a: "Coupled"               # Coupled | Decoupled
@@ -428,8 +428,9 @@ binary_sensor:
       - delayed_on: ${filter_delay_on}
       - delayed_off: ${filter_delay_off}
     on_press:
-      # Arm hold detection; do not toggle on press
+      # Arm hold detection and start hold timer
       - lambda: 'id(a_hold_triggered) = false;'
+      - script.execute: a_hold_check
     on_release:
       # Instant single action on release, only if hold did not fire
       - if:
@@ -463,24 +464,29 @@ binary_sensor:
                   - switch.toggle: relay_a
                 else:
                   - switch.toggle: button_a_state
-    on_multi_click:
-      # Hold (repeat)
-      - timing:
-          - ${timing_hold}
-        then:
-          - lambda: 'id(a_hold_triggered) = true;'
-          - while:
-              condition:
-                binary_sensor.is_on: button_a
-              then:
-                - light.toggle: led_status
-                - button.press: button_a_sim_hold
-                - delay: ${timing_hold_repeat}
-          - light.turn_off: led_status
+    # Hold handled by a_hold_check script (triggered on_press)
 
 script:
   # Home Assistant service integration scripts
   # These handle cooldown logic to prevent excessive API calls
+  
+  # Hold detection/loop: start after hold_start_ms if still pressed
+  - id: a_hold_check
+    then:
+      - delay: ${hold_start_ms}
+      - if:
+          condition:
+            binary_sensor.is_on: button_a
+          then:
+            - lambda: 'id(a_hold_triggered) = true;'
+            - while:
+                condition:
+                  binary_sensor.is_on: button_a
+                then:
+                  - light.toggle: led_status
+                  - button.press: button_a_sim_hold
+                  - delay: ${timing_hold_repeat}
+            - light.turn_off: led_status
   - id: a_on_action
     then:
       - if:
