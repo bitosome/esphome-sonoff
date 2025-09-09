@@ -25,7 +25,7 @@ substitutions:
   filter_delay_off: 10ms
 
   # Hold timing (single is instant via on_press)
-  timing_hold: ON for at least 1s
+  timing_hold: ON for at least 200ms
   timing_hold_repeat: 500ms
 
   default_mode_a: "Coupled"               # Coupled | Decoupled
@@ -131,6 +131,12 @@ globals:
     restore_value: false
     initial_value: '0'
   
+  # Track whether the current press has fired a hold
+  - id: a_hold_triggered
+    type: bool
+    restore_value: false
+    initial_value: 'false'
+
   # Feedback loop protection for switch groups
   - id: last_external_change_ms_a
     type: uint32_t
@@ -422,10 +428,13 @@ binary_sensor:
       - delayed_on: ${filter_delay_on}
       - delayed_off: ${filter_delay_off}
     on_press:
-      # Instant single press action with protection
+      # Arm hold detection; do not toggle on press
+      - lambda: 'id(a_hold_triggered) = false;'
+    on_release:
+      # Instant single action on release, only if hold did not fire
       - if:
           condition:
-            lambda: 'return (millis() - id(last_user_toggle_ms_a)) >= (uint32_t) ${min_toggle_interval_ms};'
+            lambda: 'return !id(a_hold_triggered) && (millis() - id(last_user_toggle_ms_a)) >= (uint32_t) ${min_toggle_interval_ms};'
           then:
             - lambda: |-
                 id(last_user_toggle_ms_a) = millis();
@@ -459,6 +468,7 @@ binary_sensor:
       - timing:
           - ${timing_hold}
         then:
+          - lambda: 'id(a_hold_triggered) = true;'
           - while:
               condition:
                 binary_sensor.is_on: button_a
