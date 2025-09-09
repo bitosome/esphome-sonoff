@@ -34,7 +34,7 @@ substitutions:
   
   # Circuit breaker and debouncing settings
   circuit_breaker_reset_interval_ms: 5000  # reset circuit breaker counter after this time
-  circuit_breaker_max_toggles: 20           # max toggles before circuit breaker triggers
+  circuit_breaker_max_toggles: 50           # max toggles before circuit breaker triggers
   ha_action_cooldown_ms: 10               # cooldown between HA service calls (close to 0, with circuit breaker protection)
   relay_sync_cooldown_ms: 100              # prevent HA-initiated loops in coupled mode
   feedback_loop_protection_ms: 1000        # prevent switch group feedback loops
