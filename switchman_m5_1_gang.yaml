@@ -4,7 +4,7 @@ substitutions:
   device_ip: ""
   device_make: "Sonoff"
   device_model: "Switchman M5 (1-Gang)"
-  package_version: "1.0.0"
+  package_version: "1.1.0"
 
   api_key: !secret api_key
   wifi_ssid: !secret wifi_ssid
@@ -13,9 +13,9 @@ substitutions:
 
   button_a_gpio: GPIO00
   relay_a_gpio: GPIO23
-  led_indicator_gpio: GPIO19
-  led_status_gpio: GPIO05
-  led_pwm_output_gpio: GPIO18
+  led_indicator_gpio: GPIO19      # Red LED - shows button_a_state (ON = red light)
+  led_status_gpio: GPIO05         # Blue LED - used for system status
+  led_pwm_output_gpio: GPIO18     # PWM control for red LED brightness
 
   log_level: INFO
   timezone: "Europe/Tallinn"
@@ -23,11 +23,12 @@ substitutions:
   filter_delay_on: 50ms
   filter_delay_off: 50ms
 
-  # Double & hold timings (single is instant via on_press)
-  timing_double_click_1: ON for at most 300ms
-  timing_double_click_2: OFF for at most 200ms
-  timing_double_click_3: ON for at most 300ms
-  timing_double_click_4: OFF for at least 120ms
+  # Multi-click timing configuration (optimized for UX)
+  timing_single_click_off: OFF for at least 300ms   # responsive single-click delay
+  timing_double_click_1: ON for at most 250ms      # tighter double-click window
+  timing_double_click_2: OFF for at most 250ms     # faster inter-click timing  
+  timing_double_click_3: ON for at most 250ms      # consistent click duration
+  timing_double_click_4: OFF for at least 50ms     # minimal final delay
 
   timing_hold: ON for at least 1s
   timing_hold_repeat: 500ms
@@ -39,10 +40,15 @@ substitutions:
   # Circuit breaker and debouncing settings
   circuit_breaker_reset_interval_ms: 5000  # reset circuit breaker counter after this time
   circuit_breaker_max_toggles: 3           # max toggles before circuit breaker triggers
-  ha_action_cooldown_ms: 100               # cooldown between HA service calls
+  ha_action_cooldown_ms: 2000              # cooldown between HA service calls (increased for group stability)
   relay_sync_cooldown_ms: 100              # prevent HA-initiated loops in coupled mode
+  feedback_loop_protection_ms: 5000        # prevent switch group feedback loops
 
   # HA service wiring (leave empty to do nothing)
+  # CRITICAL: When using Home Assistant switch groups, these settings prevent feedback loops:
+  # - ha_action_cooldown_ms: 2000ms (increased from 100ms) 
+  # - feedback_loop_protection_ms: 5000ms (blocks calls after external changes)
+  # Without proper protection, multiple switches calling the same group can cause endless flickering!
   button_a_on_service: ""
   button_a_on_entity: ""
   button_a_off_service: ""
@@ -125,8 +131,14 @@ globals:
     restore_value: false
     initial_value: '0'
   
-  # Script-level debouncing
+  # Script-level debouncing and feedback loop protection
   - id: last_ha_action_ms_a
+    type: uint32_t
+    restore_value: false
+    initial_value: '0'
+  
+  # Feedback loop protection for switch groups
+  - id: last_external_change_ms_a
     type: uint32_t
     restore_value: false
     initial_value: '0'
@@ -261,6 +273,9 @@ light:
     restore_mode: RESTORE_DEFAULT_OFF
 
 switch:
+  # LED BEHAVIOR (1-Gang): Red LED mirrors button_a_state
+  # - button_a_state ON → Red LED ON (intentional design)
+  # - This provides visual feedback for virtual button state
   - platform: gpio
     name: "LED indicator"
     id: led_indicator
@@ -305,6 +320,14 @@ switch:
     restore_mode: RESTORE_DEFAULT_OFF
     on_turn_on:
       - switch.turn_on: led_indicator  # Always sync LED indicator
+      # Track external changes (from HA) for feedback loop protection
+      - if:
+          condition:
+            lambda: 'return (millis() - id(last_user_toggle_ms_a)) >= 1000;'  # If >1s since user action, likely external
+          then:
+            - lambda: |-
+                id(last_external_change_ms_a) = millis();
+                ESP_LOGD("feedback", "External change detected for button_a_state ON");
       # Decoupled mode: trigger HA action only (relay stays independent)
       - if:
           condition:
@@ -319,6 +342,14 @@ switch:
             - switch.turn_on: relay_a
     on_turn_off:
       - switch.turn_off: led_indicator  # Always sync LED indicator
+      # Track external changes (from HA) for feedback loop protection
+      - if:
+          condition:
+            lambda: 'return (millis() - id(last_user_toggle_ms_a)) >= 1000;'  # If >1s since user action, likely external
+          then:
+            - lambda: |-
+                id(last_external_change_ms_a) = millis();
+                ESP_LOGD("feedback", "External change detected for button_a_state OFF");
       # Decoupled mode: trigger HA action only (relay stays independent)
       - if:
           condition:
@@ -405,10 +436,10 @@ binary_sensor:
       - delayed_on: ${filter_delay_on}
       - delayed_off: ${filter_delay_off}
     on_multi_click:
-      # Single click (with minimal delay for double-click detection)
+      # Single click (300ms delay allows double-click detection, still responsive)
       - timing:
           - ON for at most 300ms
-          - OFF for at least 50ms
+          - ${timing_single_click_off}
         then:
           # Anti-bounce protection: prevent rapid toggling
           - if:
@@ -430,14 +461,14 @@ binary_sensor:
                       ESP_LOGW("switch", "Circuit breaker triggered for channel A - too many toggles");
                       return; // Skip this toggle to protect relay
                     }
-                # Mode-dependent behavior:
-                # COUPLED: Physical button controls both relay and HA actions
-                # DECOUPLED: Physical button only controls HA actions, relay independent
+                # Mode-dependent behavior - FEEDBACK LOOP PROTECTION:
+                # COUPLED: Physical button controls both relay AND HA services (with protection)  
+                # DECOUPLED: Physical button only controls HA actions (no relay)
                 - if:
                     condition:
                       lambda: 'return id(mode_a).state == std::string("Coupled");'
                     then:
-                      # Coupled mode: toggle relay and trigger HA action based on new state
+                      # Coupled mode: toggle relay and call HA service (but with enhanced protection)
                       - if:
                           condition:
                             lambda: 'return id(relay_a).state == false;'
@@ -479,28 +510,46 @@ script:
       - if:
           condition:
             and:
-              - lambda: 'return (millis() - id(last_ha_action_ms_a)) >= ${ha_action_cooldown_ms};'  # HA service cooldown
+              # Standard cooldown check
+              - lambda: 'return (millis() - id(last_ha_action_ms_a)) >= ${ha_action_cooldown_ms};'
+              # Service configuration check
               - lambda: 'return std::string("${button_a_on_service}") != "" && std::string("${button_a_on_entity}") != "";'
+              # Feedback loop protection - don't call HA if recent external change detected
+              - lambda: 'return (millis() - id(last_external_change_ms_a)) >= ${feedback_loop_protection_ms};'
           then:
-            - lambda: 'id(last_ha_action_ms_a) = millis();'
+            - lambda: |-
+                id(last_ha_action_ms_a) = millis();
+                ESP_LOGD("ha_service", "Calling HA service: ${button_a_on_service} on ${button_a_on_entity}");
             - homeassistant.service:
                 service: "${button_a_on_service}"
                 data:
                   entity_id: "${button_a_on_entity}"
+          else:
+            - lambda: |-
+                ESP_LOGW("ha_service", "HA service call blocked - cooldown or feedback protection active");
 
   - id: a_off_action
     then:
       - if:
           condition:
             and:
-              - lambda: 'return (millis() - id(last_ha_action_ms_a)) >= ${ha_action_cooldown_ms};'  # HA service cooldown
+              # Standard cooldown check
+              - lambda: 'return (millis() - id(last_ha_action_ms_a)) >= ${ha_action_cooldown_ms};'
+              # Service configuration check
               - lambda: 'return std::string("${button_a_off_service}") != "" && std::string("${button_a_off_entity}") != "";'
+              # Feedback loop protection - don't call HA if recent external change detected
+              - lambda: 'return (millis() - id(last_external_change_ms_a)) >= ${feedback_loop_protection_ms};'
           then:
-            - lambda: 'id(last_ha_action_ms_a) = millis();'
+            - lambda: |-
+                id(last_ha_action_ms_a) = millis();
+                ESP_LOGD("ha_service", "Calling HA service: ${button_a_off_service} on ${button_a_off_entity}");
             - homeassistant.service:
                 service: "${button_a_off_service}"
                 data:
                   entity_id: "${button_a_off_entity}"
+          else:
+            - lambda: |-
+                ESP_LOGW("ha_service", "HA service call blocked - cooldown or feedback protection active");
 
   # Double-click gesture: calls HA service without cooldown (less frequent)
   - id: a_double_action

@@ -4,7 +4,7 @@ substitutions:
   device_ip: ""
   device_make: "Sonoff"
   device_model: "Switchman M5 (2-Gang)"
-  package_version: "1.0.0"
+  package_version: "1.1.0"
 
   api_key: !secret api_key
   wifi_ssid: !secret wifi_ssid
@@ -15,9 +15,9 @@ substitutions:
   button_b_gpio: GPIO15
   relay_a_gpio: GPIO23
   relay_b_gpio: GPIO19
-  led_indicator_gpio: GPIO22
-  led_status_gpio: GPIO05
-  led_pwm_output_gpio: GPIO18
+  led_indicator_gpio: GPIO22      # Red LED - shows button_b_state (channel B indicator)
+  led_status_gpio: GPIO05         # Blue LED - shows button_a_state (channel A indicator) 
+  led_pwm_output_gpio: GPIO18     # PWM control for red LED brightness
 
   log_level: INFO
   timezone: "Europe/Tallinn"
@@ -25,11 +25,12 @@ substitutions:
   filter_delay_on: 50ms
   filter_delay_off: 50ms
 
-  # Double & hold timings (single is instant via on_press)
-  timing_double_click_1: ON for at most 300ms
-  timing_double_click_2: OFF for at most 200ms
-  timing_double_click_3: ON for at most 300ms
-  timing_double_click_4: OFF for at least 120ms
+  # Multi-click timing configuration (optimized for UX)
+  timing_single_click_off: OFF for at least 300ms   # responsive single-click delay
+  timing_double_click_1: ON for at most 250ms      # tighter double-click window
+  timing_double_click_2: OFF for at most 250ms     # faster inter-click timing  
+  timing_double_click_3: ON for at most 250ms      # consistent click duration
+  timing_double_click_4: OFF for at least 50ms     # minimal final delay
 
   timing_hold: ON for at least 1s
   timing_hold_repeat: 500ms
@@ -43,8 +44,9 @@ substitutions:
   # Circuit breaker and debouncing settings
   circuit_breaker_reset_interval_ms: 5000  # reset circuit breaker counter after this time
   circuit_breaker_max_toggles: 3           # max toggles before circuit breaker triggers
-  ha_action_cooldown_ms: 100               # cooldown between HA service calls
+  ha_action_cooldown_ms: 2000              # cooldown between HA service calls (increased for group stability)
   relay_sync_cooldown_ms: 100              # prevent HA-initiated loops in coupled mode
+  feedback_loop_protection_ms: 5000        # prevent switch group feedback loops
 
   # HA actions — A
   button_a_on_service: ""
@@ -321,9 +323,12 @@ light:
     restore_mode: RESTORE_DEFAULT_OFF
 
 switch:
-  # Red LED indicator - mirrors channel B state, hidden from HA UI
+  # LED BEHAVIOR (2-Gang): Different from 1-gang due to hardware wiring limitations
+  # - Channel A (button_a_state) ON → Blue LED ON (led_status)  
+  # - Channel B (button_b_state) ON → Red LED ON (led_indicator)
+  # This asymmetric design is INTENTIONAL due to physical PCB constraints
   - platform: gpio
-    name: "LED indicator"
+    name: "LED indicator" 
     id: led_indicator
     internal: true
     pin: ${led_indicator_gpio}
@@ -554,10 +559,10 @@ binary_sensor:
       - delayed_on: ${filter_delay_on}
       - delayed_off: ${filter_delay_off}
     on_multi_click:
-      # Single click (with minimal delay for double-click detection)
+      # Single click (300ms delay allows double-click detection, still responsive)
       - timing:
           - ON for at most 300ms
-          - OFF for at least 50ms
+          - ${timing_single_click_off}
         then:
           - if:
               condition:
@@ -632,10 +637,10 @@ binary_sensor:
       - delayed_on: ${filter_delay_on}
       - delayed_off: ${filter_delay_off}
     on_multi_click:
-      # Single click (with minimal delay for double-click detection)
+      # Single click (300ms delay allows double-click detection, still responsive)
       - timing:
           - ON for at most 300ms
-          - OFF for at least 50ms
+          - ${timing_single_click_off}
         then:
           - if:
               condition:
