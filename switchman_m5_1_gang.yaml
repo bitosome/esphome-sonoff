@@ -4,7 +4,7 @@ substitutions:
   device_ip: ""
   device_make: "Sonoff"
   device_model: "Switchman M5 (1-Gang)"
-  package_version: "2.0.4"
+  package_version: "2.0.5"
 
   api_key: !secret api_key
   wifi_ssid: !secret wifi_ssid
@@ -99,8 +99,8 @@ wifi:
   password: ${wifi_password}
 
 ota:
-  - platform: esphome
-    password: ${ota_password}
+  platform: esphome
+  password: ${ota_password}
 
 api:
   encryption:
@@ -409,7 +409,7 @@ select:
             else:
               - switch.turn_off: relay_a
 
-number: []
+number:
 
 binary_sensor:
   # Physical button A with multi-click detection
@@ -499,6 +499,8 @@ script:
                   - delay: 100ms
                   - light.turn_off: led_status
                   - delay: 500ms
+      # Ensure blue LED is OFF when hold action ends
+      - light.turn_off: led_status
   
   # Hold detection (single fire): start after hold_start_ms if still pressed
   - id: a_hold_check
