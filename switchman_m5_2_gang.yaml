@@ -11,7 +11,7 @@ substitutions:
   ota_password: !secret ota_password
   ap_password: !secret ap_password
 
-  button_a_gpio: GPIO13
+  button_a_gpio: GPIO04
   button_b_gpio: GPIO15
   relay_a_gpio: GPIO23
   relay_b_gpio: GPIO19
