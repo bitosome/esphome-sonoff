@@ -4,6 +4,7 @@ substitutions:
   device_make: "Sonoff"
   device_model: "Switchman M5 (1-Gang)"
   package_version: "3.0.0"
+
   api_key: !secret api_key
   wifi_ssid: !secret wifi_ssid
   wifi_password: !secret wifi_password
@@ -42,6 +43,7 @@ esp32:
     version: recommended
 
 logger:
+  level: INFO
   baud_rate: 0
 
 wifi:
