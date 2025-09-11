@@ -1,110 +1,47 @@
 substitutions:
   device_friendly_name: "Switchman M5 2G"
   device_name: "switchman-m5-2g"
-  device_ip: ""
   device_make: "Sonoff"
   device_model: "Switchman M5 (2-Gang)"
-  package_version: "2.0.5"
-
+  package_version: "3.0.0"
   api_key: !secret api_key
   wifi_ssid: !secret wifi_ssid
   wifi_password: !secret wifi_password
   ota_password: !secret ota_password
-
   button_a_gpio: GPIO04
   button_b_gpio: GPIO15
   relay_a_gpio: GPIO23
   relay_b_gpio: GPIO19
-  led_indicator_gpio: GPIO22      # Red LED - shows button_b_state (channel B indicator)
-  led_status_gpio: GPIO05         # Blue LED - shows button_a_state (channel A indicator) 
-  led_pwm_output_gpio: GPIO18     # PWM control for red LED brightness
-
-  log_level: INFO
-  timezone: "Europe/Tallinn"
-
-  # Shorter GPIO debounce to reduce perceived latency
-  filter_delay_on: 10ms
-  filter_delay_off: 10ms
-
-  # Hold timing (single is instant on release)
-  # Double-click removed; hold starts after this threshold
+  red_led_gpio: GPIO22
+  blue_led_gpio: GPIO05
   hold_start_ms: 200ms
-
-  default_mode_a: "Coupled"              # "Coupled" | "Decoupled"
-  default_mode_b: "Coupled"              # "Coupled" | "Decoupled"
-  default_relay_a_target_mode: "Off"     # "On" | "Off" when HA/API is available
-  default_relay_b_target_mode: "Off"     # "On" | "Off" when HA/API is available
-  min_toggle_interval_ms: 100             # ignore extra presses faster than this (close to 0 for human speed)
-  
-  # Circuit breaker and debouncing settings
-  circuit_breaker_reset_interval_ms: 5000  # reset circuit breaker counter after this time
-  circuit_breaker_max_toggles: 50           # max toggles before circuit breaker triggers
-  ha_action_cooldown_ms: 10               # cooldown between HA service calls (close to 0, with circuit breaker protection)
-  relay_sync_cooldown_ms: 100              # prevent HA-initiated loops in coupled mode
-  feedback_loop_protection_ms: 1000        # prevent switch group feedback loops
-
-  # HA actions — A
+  debounce_ms: 100ms
   button_a_on_service: ""
   button_a_on_entity: ""
   button_a_off_service: ""
   button_a_off_entity: ""
-  # Double-click removed — these services are unused
   button_a_hold_service: ""
   button_a_hold_entity: ""
-
-  # HA actions — B
   button_b_on_service: ""
   button_b_on_entity: ""
   button_b_off_service: ""
   button_b_off_entity: ""
-  # Double-click removed — these services are unused
   button_b_hold_service: ""
   button_b_hold_entity: ""
+  default_mode_a: "Coupled"
+  default_mode_b: "Coupled"
+  default_relay_a_target_mode: "Off"
+  default_relay_b_target_mode: "Off"
 
 esphome:
   name: "${device_name}"
   friendly_name: "${device_friendly_name}"
   comment: "${device_model} by ${device_make} version ${package_version}"
-  name_add_mac_suffix: false
   on_boot:
     - priority: 900.0
       then:
         - lambda: |-
             id(cpu_speed) = ESP.getCpuFreqMHz();
-    # Boot sequence: Sync both relays to button states when in Coupled mode
-    # Ensures physical relays match virtual button states after restart
-    - priority: 600.0
-      then:
-        - if:
-            condition:
-              lambda: 'return id(mode_a).state == std::string("Coupled");'
-            then:
-              - if:
-                  condition:
-                    lambda: 'return id(button_a_state).state != id(relay_a).state;'
-                  then:
-                    - if:
-                        condition:
-                          lambda: 'return id(button_a_state).state;'
-                        then:
-                          - switch.turn_on: relay_a
-                        else:
-                          - switch.turn_off: relay_a
-        - if:
-            condition:
-              lambda: 'return id(mode_b).state == std::string("Coupled");'
-            then:
-              - if:
-                  condition:
-                    lambda: 'return id(button_b_state).state != id(relay_b).state;'
-                  then:
-                    - if:
-                        condition:
-                          lambda: 'return id(button_b_state).state;'
-                        then:
-                          - switch.turn_on: relay_b
-                        else:
-                          - switch.turn_off: relay_b
 
 esp32:
   board: esp32dev
@@ -113,12 +50,9 @@ esp32:
     version: recommended
 
 logger:
-  level: "${log_level}"
   baud_rate: 0
 
 wifi:
-  fast_connect: false
-  power_save_mode: none
   ssid: ${wifi_ssid}
   password: ${wifi_password}
 
@@ -133,38 +67,7 @@ api:
 web_server:
   port: 80
 
-time:
-  - platform: sntp
-    id: time_service
-    timezone: ${timezone}
-
 globals:
-  - id: cpu_speed
-    type: int
-    restore_value: false
-    initial_value: "0"
-
-  # Per-channel quick-tap guards
-  - id: last_user_toggle_ms_a
-    type: uint32_t
-    restore_value: false
-    initial_value: '0'
-  - id: last_user_toggle_ms_b
-    type: uint32_t
-    restore_value: false
-    initial_value: '0'
-  
-  # Script-level debouncing
-  - id: last_ha_action_ms_a
-    type: uint32_t
-    restore_value: false
-    initial_value: '0'
-  - id: last_ha_action_ms_b
-    type: uint32_t
-    restore_value: false
-    initial_value: '0'
-  
-  # Hold detection flags (per channel)
   - id: a_hold_triggered
     type: bool
     restore_value: false
@@ -173,24 +76,18 @@ globals:
     type: bool
     restore_value: false
     initial_value: 'false'
-  
-  # Circuit breaker protection
-  - id: toggle_count_a
+  - id: button_a_busy
+    type: bool
+    restore_value: false
+    initial_value: 'false'
+  - id: button_b_busy
+    type: bool
+    restore_value: false
+    initial_value: 'false'
+  - id: cpu_speed
     type: int
     restore_value: false
-    initial_value: '0'
-  - id: circuit_breaker_start_ms_a
-    type: uint32_t
-    restore_value: false
-    initial_value: '0'
-  - id: toggle_count_b
-    type: int
-    restore_value: false
-    initial_value: '0'
-  - id: circuit_breaker_start_ms_b
-    type: uint32_t
-    restore_value: false
-    initial_value: '0'
+    initial_value: "0"
 
 text_sensor:
   - platform: wifi_info
@@ -275,172 +172,119 @@ button:
     name: "Button A hold action"
     id: button_a_sim_hold
     on_press:
-      - script.execute: a_hold_press
+      - script.execute: a_hold_action
 
   - platform: template
     name: "Button B hold action"
     id: button_b_sim_hold
     on_press:
-      - script.execute: b_hold_press
-
-output:
-  - platform: ledc
-    id: pwm_output
-    pin: ${led_pwm_output_gpio}
-    frequency: 1000 Hz
+      - script.execute: b_hold_action
 
 light:
-  - platform: monochromatic
-    output: pwm_output
-    name: "Red LED"
-    id: red_led_backlight
-    internal: true
-    restore_mode: RESTORE_DEFAULT_OFF
-    icon: 'mdi:led-outline'
-    entity_category: 'config'
-
   - platform: status_led
     name: "Blue LED"
-    id: led_status
+    id: blue_led
     internal: true
     pin:
-      number: ${led_status_gpio}
+      number: ${blue_led_gpio}
       inverted: true
       ignore_strapping_warning: true
     restore_mode: RESTORE_DEFAULT_OFF
 
 switch:
-  # LED BEHAVIOR (2-Gang): Different from 1-gang due to hardware wiring limitations
-  # - Channel A (button_a_state) ON → Blue LED ON (led_status)  
-  # - Channel B (button_b_state) ON → Red LED ON (led_indicator)
-  # This asymmetric design is INTENTIONAL due to physical PCB constraints
   - platform: gpio
-    name: "LED indicator" 
-    id: led_indicator
+    name: "Red LED"
+    id: red_led
     internal: true
-    pin: ${led_indicator_gpio}
+    pin: ${red_led_gpio}
 
-  # Physical relay A - controls actual load switching (Channel A)
-  # Syncs with virtual button state in Coupled mode, prevents feedback loops
   - platform: gpio
     name: "Relay A"
     id: relay_a
     pin: ${relay_a_gpio}
     restore_mode: RESTORE_DEFAULT_OFF
-    on_turn_on:
-      - light.turn_on: led_status
-      - if:
-          condition:
-            and:
-              - lambda: 'return id(mode_a).state == std::string("Coupled") && id(button_a_state).state == false;'
-              - lambda: 'return (millis() - id(last_user_toggle_ms_a)) >= ${relay_sync_cooldown_ms};'  # Prevent HA-initiated loops
-          then:
-            - switch.turn_on: button_a_state
-    on_turn_off:
-      - light.turn_off: led_status
-      - if:
-          condition:
-            and:
-              - lambda: 'return id(mode_a).state == std::string("Coupled") && id(button_a_state).state == true;'
-              - lambda: 'return (millis() - id(last_user_toggle_ms_a)) >= ${relay_sync_cooldown_ms};'  # Prevent HA-initiated loops
-          then:
-            - switch.turn_off: button_a_state
 
-  # Physical relay B - controls actual load switching (Channel B)
-  # Syncs with virtual button state in Coupled mode, prevents feedback loops
   - platform: gpio
     name: "Relay B"
     id: relay_b
     pin: ${relay_b_gpio}
     restore_mode: RESTORE_DEFAULT_OFF
-    on_turn_on:
-      - switch.turn_on: led_indicator
-      - if:
-          condition:
-            and:
-              - lambda: 'return id(mode_b).state == std::string("Coupled") && id(button_b_state).state == false;'
-              - lambda: 'return (millis() - id(last_user_toggle_ms_b)) >= ${relay_sync_cooldown_ms};'  # Prevent HA-initiated loops
-          then:
-            - switch.turn_on: button_b_state
-    on_turn_off:
-      - switch.turn_off: led_indicator
-      - if:
-          condition:
-            and:
-              - lambda: 'return id(mode_b).state == std::string("Coupled") && id(button_b_state).state == true;'
-              - lambda: 'return (millis() - id(last_user_toggle_ms_b)) >= ${relay_sync_cooldown_ms};'  # Prevent HA-initiated loops
-          then:
-            - switch.turn_off: button_b_state
 
-  # Virtual button A state - represents logical switch state (Channel A)
-  # In Decoupled: independent of relay, only triggers HA actions
-  # In Coupled: bidirectionally synced with physical relay A
   - platform: template
     name: "Button A state"
     id: button_a_state
     optimistic: true
     restore_mode: RESTORE_DEFAULT_OFF
     on_turn_on:
-      - light.turn_on: led_status
-      # Only call HA action when DECOUPLED
       - if:
           condition:
-            lambda: 'return id(mode_a).state == std::string("Decoupled");'
+            lambda: 'return id(button_a_busy);'
           then:
-            - script.execute: a_on_action
-      # Mirror to Relay A in Coupled
+            - switch.toggle: button_a_state
+      - lambda: 'id(button_a_busy) = true;'
+      - light.turn_on: blue_led
+      - script.execute: a_on_action
       - if:
           condition:
             lambda: 'return id(mode_a).state == std::string("Coupled") && id(relay_a).state == false;'
           then:
             - switch.turn_on: relay_a
+      - delay: ${debounce_ms}
+      - lambda: 'id(button_a_busy) = false;'
     on_turn_off:
-      - light.turn_off: led_status
-      # Only call HA action when DECOUPLED
       - if:
           condition:
-            lambda: 'return id(mode_a).state == std::string("Decoupled");'
+            lambda: 'return id(button_a_busy);'
           then:
-            - script.execute: a_off_action
-      # Mirror to Relay A in Coupled
+            - switch.toggle: button_a_state
+      - lambda: 'id(button_a_busy) = true;'
+      - light.turn_off: blue_led
+      - script.execute: a_off_action
       - if:
           condition:
             lambda: 'return id(mode_a).state == std::string("Coupled") && id(relay_a).state == true;'
           then:
             - switch.turn_off: relay_a
+      - delay: ${debounce_ms}
+      - lambda: 'id(button_a_busy) = false;'
 
-  # Virtual button B state - represents logical switch state (Channel B) 
-  # In Decoupled: independent of relay, only triggers HA actions
-  # In Coupled: bidirectionally synced with physical relay B
   - platform: template
     name: "Button B state"
     id: button_b_state
     optimistic: true
     restore_mode: RESTORE_DEFAULT_OFF
     on_turn_on:
-      - switch.turn_on: led_indicator
       - if:
           condition:
-            lambda: 'return id(mode_b).state == std::string("Decoupled");'
+            lambda: 'return id(button_b_busy);'
           then:
-            - script.execute: b_on_action
+            - switch.toggle: button_b_state
+      - lambda: 'id(button_b_busy) = true;'
+      - switch.turn_on: red_led
+      - script.execute: b_on_action
       - if:
           condition:
             lambda: 'return id(mode_b).state == std::string("Coupled") && id(relay_b).state == false;'
           then:
             - switch.turn_on: relay_b
+      - delay: ${debounce_ms}
+      - lambda: 'id(button_b_busy) = false;'
     on_turn_off:
-      - switch.turn_off: led_indicator
       - if:
           condition:
-            lambda: 'return id(mode_b).state == std::string("Decoupled");'
+            lambda: 'return id(button_b_busy);'
           then:
-            - script.execute: b_off_action
+            - switch.toggle: button_b_state
+      - lambda: 'id(button_b_busy) = true;'
+      - switch.turn_off: red_led
+      - script.execute: b_off_action
       - if:
           condition:
             lambda: 'return id(mode_b).state == std::string("Coupled") && id(relay_b).state == true;'
           then:
             - switch.turn_off: relay_b
+      - delay: ${debounce_ms}
+      - lambda: 'id(button_b_busy) = false;'
 
 select:
   - platform: template
@@ -464,29 +308,7 @@ select:
     restore_value: true
     initial_option: ${default_mode_b}
     entity_category: config
-    on_value:
-      then:
-        - if:
-            condition:
-              lambda: 'return id(mode_b).state == std::string("Decoupled");'
-            then:
-              - if:
-                  condition:
-                    switch.is_on: button_b_state
-                  then:
-                    - switch.turn_on: led_indicator
-                  else:
-                    - switch.turn_off: led_indicator
-            else:
-              - if:
-                  condition:
-                    switch.is_on: relay_b
-                  then:
-                    - switch.turn_on: led_indicator
-                  else:
-                    - switch.turn_off: led_indicator
 
-  # Connected target modes
   - platform: template
     id: relay_a_target_mode
     name: "Relay A target mode"
@@ -527,119 +349,42 @@ select:
             else:
               - switch.turn_off: relay_b
 
-number:
-
 binary_sensor:
-  # Physical button A (Channel A)
-  # - Single: instant toggle on release with protection
-  # - Hold: single-fire action if still pressed after hold_start_ms
   - platform: gpio
     id: button_a
-    internal: true
     pin:
-      number: ${button_a_gpio}   # GPIO04
-      mode: INPUT_PULLUP
-      inverted: true
-      # GPIO4 is not a strapping pin
-    filters:
-      - delayed_on: ${filter_delay_on}
-      - delayed_off: ${filter_delay_off}
-    on_press:
-      # Arm hold detection and start timer
-      - lambda: 'id(a_hold_triggered) = false;'
-      - script.execute: a_hold_check
-    on_release:
-      # Single action on release, only if hold did not fire
-      - if:
-          condition:
-            lambda: 'return !id(a_hold_triggered) && (millis() - id(last_user_toggle_ms_a)) >= (uint32_t) ${min_toggle_interval_ms};'
-          then:
-            - lambda: |-
-                id(last_user_toggle_ms_a) = millis();
-                // Circuit breaker logic
-                uint32_t now = millis();
-                if ((now - id(circuit_breaker_start_ms_a)) > ${circuit_breaker_reset_interval_ms}) {
-                  id(toggle_count_a) = 0;
-                  id(circuit_breaker_start_ms_a) = now;
-                }
-                id(toggle_count_a)++;
-                if (id(toggle_count_a) > ${circuit_breaker_max_toggles}) {
-                  ESP_LOGW("switch", "Circuit breaker triggered for channel A - too many toggles");
-                  return; // Skip this toggle
-                }
-            - if:
-                condition:
-                  lambda: 'return id(mode_a).state == std::string("Coupled");'
-                then:
-                  - if:
-                      condition:
-                        lambda: 'return id(relay_a).state == false;'
-                      then:
-                        - script.execute: a_on_action
-                      else:
-                        - script.execute: a_off_action
-                  - switch.toggle: relay_a
-                else:
-                  - switch.toggle: button_a_state
-
-  # Physical button B (Channel B)
-  # - Single: instant toggle on release with protection
-  # - Hold: single-fire action if still pressed after hold_start_ms
-  # Note: GPIO15 is a strapping pin - may affect boot if held during startup
-  - platform: gpio
-    id: button_b
-    internal: true
-    pin:
-      number: ${button_b_gpio}   # GPIO15 (strapping pin)
+      number: ${button_a_gpio}
       mode: INPUT_PULLUP
       inverted: true
       ignore_strapping_warning: true
-    filters:
-      - delayed_on: ${filter_delay_on}
-      - delayed_off: ${filter_delay_off}
     on_press:
-      # Arm hold detection and start timer
+      - lambda: 'id(a_hold_triggered) = false;'
+      - script.execute: a_hold_check
+    on_release:
+      - if:
+          condition:
+            lambda: 'return !id(a_hold_triggered);'
+          then:
+            - switch.toggle: button_a_state
+
+  - platform: gpio
+    id: button_b
+    pin:
+      number: ${button_b_gpio}
+      mode: INPUT_PULLUP
+      inverted: true
+      ignore_strapping_warning: true
+    on_press:
       - lambda: 'id(b_hold_triggered) = false;'
       - script.execute: b_hold_check
     on_release:
-      # Single action on release, only if hold did not fire
       - if:
           condition:
-            lambda: 'return !id(b_hold_triggered) && (millis() - id(last_user_toggle_ms_b)) >= (uint32_t) ${min_toggle_interval_ms};'
+            lambda: 'return !id(b_hold_triggered);'
           then:
-            - lambda: |-
-                id(last_user_toggle_ms_b) = millis();
-                // Circuit breaker logic
-                uint32_t now = millis();
-                if ((now - id(circuit_breaker_start_ms_b)) > ${circuit_breaker_reset_interval_ms}) {
-                  id(toggle_count_b) = 0;
-                  id(circuit_breaker_start_ms_b) = now;
-                }
-                id(toggle_count_b)++;
-                if (id(toggle_count_b) > ${circuit_breaker_max_toggles}) {
-                  ESP_LOGW("switch", "Circuit breaker triggered for channel B - too many toggles");
-                  return; // Skip this toggle
-                }
-            - if:
-                condition:
-                  lambda: 'return id(mode_b).state == std::string("Coupled");'
-                then:
-                  - if:
-                      condition:
-                        lambda: 'return id(relay_b).state == false;'
-                      then:
-                        - script.execute: b_on_action
-                      else:
-                        - script.execute: b_off_action
-                  - switch.toggle: relay_b
-                else:
-                  - switch.toggle: button_b_state
+            - switch.toggle: button_b_state
 
 script:
-  # Home Assistant service integration scripts
-  # These handle cooldown logic to prevent excessive API calls
-  
-  # Hold blinking feedback for channel A
   - id: a_hold_blink
     mode: restart
     then:
@@ -647,31 +392,12 @@ script:
           condition:
             binary_sensor.is_on: button_a
           then:
-            - if:
-                condition:
-                  switch.is_on: button_a_state
-                then:
-                  - light.turn_off: led_status
-                  - delay: 100ms
-                  - light.turn_on: led_status
-                  - delay: 100ms
-                  - light.turn_off: led_status
-                  - delay: 100ms
-                  - light.turn_on: led_status
-                  - delay: 500ms
-                else:
-                  - light.turn_on: led_status
-                  - delay: 100ms
-                  - light.turn_off: led_status
-                  - delay: 100ms
-                  - light.turn_on: led_status
-                  - delay: 100ms
-                  - light.turn_off: led_status
-                  - delay: 500ms
-      # Ensure blue LED is OFF when hold action ends
-      - light.turn_off: led_status
-  
-  # Hold detection (single fire): start after hold_start_ms if still pressed
+            - light.turn_on: blue_led
+            - delay: 100ms
+            - light.turn_off: blue_led
+            - delay: 100ms
+      - light.turn_off: blue_led
+
   - id: a_hold_check
     then:
       - delay: ${hold_start_ms}
@@ -682,17 +408,13 @@ script:
             - lambda: 'id(a_hold_triggered) = true;'
             - script.execute: a_hold_blink
             - button.press: button_a_sim_hold
-  
-  # Channel A action scripts
+
   - id: a_on_action
     then:
       - if:
           condition:
-            and:
-              - lambda: 'return (millis() - id(last_ha_action_ms_a)) >= ${ha_action_cooldown_ms};'  # HA service cooldown
-              - lambda: 'return std::string("${button_a_on_service}") != "" && std::string("${button_a_on_entity}") != "";'
+            lambda: 'return std::string("${button_a_on_service}") != "" && std::string("${button_a_on_entity}") != "";'
           then:
-            - lambda: 'id(last_ha_action_ms_a) = millis();'
             - homeassistant.service:
                 service: "${button_a_on_service}"
                 data:
@@ -702,20 +424,14 @@ script:
     then:
       - if:
           condition:
-            and:
-              - lambda: 'return (millis() - id(last_ha_action_ms_a)) >= ${ha_action_cooldown_ms};'  # HA service cooldown
-              - lambda: 'return std::string("${button_a_off_service}") != "" && std::string("${button_a_off_entity}") != "";'
+            lambda: 'return std::string("${button_a_off_service}") != "" && std::string("${button_a_off_entity}") != "";'
           then:
-            - lambda: 'id(last_ha_action_ms_a) = millis();'
             - homeassistant.service:
                 service: "${button_a_off_service}"
                 data:
                   entity_id: "${button_a_off_entity}"
 
-  # Double-click removed for channel A
-
-  # Hold gesture A: calls HA service without cooldown (repeating action)
-  - id: a_hold_press
+  - id: a_hold_action
     then:
       - if:
           condition:
@@ -726,9 +442,6 @@ script:
                 data:
                   entity_id: "${button_a_hold_entity}"
 
-  # Channel B action scripts
-  
-  # Hold blinking feedback for channel B
   - id: b_hold_blink
     mode: restart
     then:
@@ -736,31 +449,12 @@ script:
           condition:
             binary_sensor.is_on: button_b
           then:
-            - if:
-                condition:
-                  switch.is_on: button_b_state
-                then:
-                  - light.turn_off: led_status
-                  - delay: 100ms
-                  - light.turn_on: led_status
-                  - delay: 100ms
-                  - light.turn_off: led_status
-                  - delay: 100ms
-                  - light.turn_on: led_status
-                  - delay: 500ms
-                else:
-                  - light.turn_on: led_status
-                  - delay: 100ms
-                  - light.turn_off: led_status
-                  - delay: 100ms
-                  - light.turn_on: led_status
-                  - delay: 100ms
-                  - light.turn_off: led_status
-                  - delay: 500ms
-      # Ensure blue LED is OFF when hold action ends
-      - light.turn_off: led_status
-  
-  # Hold detection (single fire) for channel B
+            - light.turn_on: blue_led
+            - delay: 100ms
+            - light.turn_off: blue_led
+            - delay: 100ms
+      - light.turn_off: blue_led
+
   - id: b_hold_check
     then:
       - delay: ${hold_start_ms}
@@ -771,15 +465,13 @@ script:
             - lambda: 'id(b_hold_triggered) = true;'
             - script.execute: b_hold_blink
             - button.press: button_b_sim_hold
+
   - id: b_on_action
     then:
       - if:
           condition:
-            and:
-              - lambda: 'return (millis() - id(last_ha_action_ms_b)) >= ${ha_action_cooldown_ms};'  # HA service cooldown
-              - lambda: 'return std::string("${button_b_on_service}") != "" && std::string("${button_b_on_entity}") != "";'
+            lambda: 'return std::string("${button_b_on_service}") != "" && std::string("${button_b_on_entity}") != "";'
           then:
-            - lambda: 'id(last_ha_action_ms_b) = millis();'
             - homeassistant.service:
                 service: "${button_b_on_service}"
                 data:
@@ -789,20 +481,14 @@ script:
     then:
       - if:
           condition:
-            and:
-              - lambda: 'return (millis() - id(last_ha_action_ms_b)) >= ${ha_action_cooldown_ms};'  # HA service cooldown
-              - lambda: 'return std::string("${button_b_off_service}") != "" && std::string("${button_b_off_entity}") != "";'
+            lambda: 'return std::string("${button_b_off_service}") != "" && std::string("${button_b_off_entity}") != "";'
           then:
-            - lambda: 'id(last_ha_action_ms_b) = millis();'
             - homeassistant.service:
                 service: "${button_b_off_service}"
                 data:
                   entity_id: "${button_b_off_entity}"
 
-  # Double-click removed for channel B
-
-  # Hold gesture B: calls HA service without cooldown (repeating action)
-  - id: b_hold_press
+  - id: b_hold_action
     then:
       - if:
           condition:
