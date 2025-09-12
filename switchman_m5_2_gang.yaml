@@ -3,7 +3,7 @@ substitutions:
   device_name: "switchman-m5-2g"
   device_make: "Sonoff"
   device_model: "Switchman M5 (2-Gang)"
-  package_version: "3.0.0"
+  package_version: "3.0.2"
 
   api_key: !secret api_key
   wifi_ssid: !secret wifi_ssid
@@ -35,7 +35,7 @@ substitutions:
 
   button_b_off_service: ""
   button_b_off_entity: ""
-  
+
   button_b_hold_service: ""
   button_b_hold_entity: ""
 
@@ -43,7 +43,7 @@ substitutions:
   default_relay_b_target_mode: "Off"
 
   hold_start_ms: 200ms
-  debounce_ms: 100ms
+  debounce_ms: 50ms
 
 esphome:
   name: "${device_name}"
@@ -65,6 +65,9 @@ logger:
   level: INFO
   baud_rate: 0
 
+preferences:
+  flash_write_interval: 5min
+
 wifi:
   ssid: ${wifi_ssid}
   password: ${wifi_password}
@@ -84,19 +87,19 @@ globals:
   - id: a_hold_triggered
     type: bool
     restore_value: false
-    initial_value: 'false'
+    initial_value: "false"
   - id: b_hold_triggered
     type: bool
     restore_value: false
-    initial_value: 'false'
+    initial_value: "false"
   - id: button_a_busy
     type: bool
     restore_value: false
-    initial_value: 'false'
+    initial_value: "false"
   - id: button_b_busy
     type: bool
     restore_value: false
-    initial_value: 'false'
+    initial_value: "false"
   - id: cpu_speed
     type: int
     restore_value: false
@@ -231,10 +234,10 @@ switch:
     on_turn_on:
       - if:
           condition:
-            lambda: 'return id(button_a_busy);'
+            lambda: "return id(button_a_busy);"
           then:
             - switch.toggle: button_a_state
-      - lambda: 'id(button_a_busy) = true;'
+      - lambda: "id(button_a_busy) = true;"
       - light.turn_on: blue_led
       - script.execute: a_on_action
       - if:
@@ -243,14 +246,14 @@ switch:
           then:
             - switch.turn_on: relay_a
       - delay: ${debounce_ms}
-      - lambda: 'id(button_a_busy) = false;'
+      - lambda: "id(button_a_busy) = false;"
     on_turn_off:
       - if:
           condition:
-            lambda: 'return id(button_a_busy);'
+            lambda: "return id(button_a_busy);"
           then:
             - switch.toggle: button_a_state
-      - lambda: 'id(button_a_busy) = true;'
+      - lambda: "id(button_a_busy) = true;"
       - light.turn_off: blue_led
       - script.execute: a_off_action
       - if:
@@ -259,7 +262,7 @@ switch:
           then:
             - switch.turn_off: relay_a
       - delay: ${debounce_ms}
-      - lambda: 'id(button_a_busy) = false;'
+      - lambda: "id(button_a_busy) = false;"
 
   - platform: template
     name: "Button B state"
@@ -269,10 +272,10 @@ switch:
     on_turn_on:
       - if:
           condition:
-            lambda: 'return id(button_b_busy);'
+            lambda: "return id(button_b_busy);"
           then:
             - switch.toggle: button_b_state
-      - lambda: 'id(button_b_busy) = true;'
+      - lambda: "id(button_b_busy) = true;"
       - switch.turn_on: red_led
       - script.execute: b_on_action
       - if:
@@ -281,14 +284,14 @@ switch:
           then:
             - switch.turn_on: relay_b
       - delay: ${debounce_ms}
-      - lambda: 'id(button_b_busy) = false;'
+      - lambda: "id(button_b_busy) = false;"
     on_turn_off:
       - if:
           condition:
-            lambda: 'return id(button_b_busy);'
+            lambda: "return id(button_b_busy);"
           then:
             - switch.toggle: button_b_state
-      - lambda: 'id(button_b_busy) = true;'
+      - lambda: "id(button_b_busy) = true;"
       - switch.turn_off: red_led
       - script.execute: b_off_action
       - if:
@@ -297,7 +300,7 @@ switch:
           then:
             - switch.turn_off: relay_b
       - delay: ${debounce_ms}
-      - lambda: 'id(button_b_busy) = false;'
+      - lambda: "id(button_b_busy) = false;"
 
 select:
   - platform: template
@@ -370,12 +373,12 @@ binary_sensor:
       mode: INPUT_PULLUP
       inverted: true
     on_press:
-      - lambda: 'id(a_hold_triggered) = false;'
+      - lambda: "id(a_hold_triggered) = false;"
       - script.execute: a_hold_check
     on_release:
       - if:
           condition:
-            lambda: 'return !id(a_hold_triggered);'
+            lambda: "return !id(a_hold_triggered);"
           then:
             - switch.toggle: button_a_state
 
@@ -387,12 +390,12 @@ binary_sensor:
       inverted: true
       ignore_strapping_warning: true
     on_press:
-      - lambda: 'id(b_hold_triggered) = false;'
+      - lambda: "id(b_hold_triggered) = false;"
       - script.execute: b_hold_check
     on_release:
       - if:
           condition:
-            lambda: 'return !id(b_hold_triggered);'
+            lambda: "return !id(b_hold_triggered);"
           then:
             - switch.toggle: button_b_state
 
@@ -421,7 +424,7 @@ script:
           condition:
             binary_sensor.is_on: button_a
           then:
-            - lambda: 'id(a_hold_triggered) = true;'
+            - lambda: "id(a_hold_triggered) = true;"
             - script.execute: a_hold_blink
             - button.press: button_a_sim_hold
 
@@ -482,7 +485,7 @@ script:
           condition:
             binary_sensor.is_on: button_b
           then:
-            - lambda: 'id(b_hold_triggered) = true;'
+            - lambda: "id(b_hold_triggered) = true;"
             - script.execute: b_hold_blink
             - button.press: button_b_sim_hold
 

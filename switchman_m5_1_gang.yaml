@@ -3,7 +3,7 @@ substitutions:
   device_name: "switchman-m5-1g"
   device_make: "Sonoff"
   device_model: "Switchman M5 (1-Gang)"
-  package_version: "3.0.0"
+  package_version: "3.0.2"
 
   api_key: !secret api_key
   wifi_ssid: !secret wifi_ssid
@@ -29,7 +29,7 @@ substitutions:
   default_relay_a_target_mode: "Off"
 
   hold_start_ms: 200ms
-  debounce_ms: 100ms
+  debounce_ms: 50ms
 
 esphome:
   name: "${device_name}"
@@ -50,6 +50,9 @@ esp32:
 logger:
   level: INFO
   baud_rate: 0
+
+preferences:
+  flash_write_interval: 5min
 
 wifi:
   ssid: ${wifi_ssid}
