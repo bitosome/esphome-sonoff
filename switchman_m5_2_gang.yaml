@@ -219,6 +219,7 @@ light:
     pin:
       number: ${blue_led_gpio}
       inverted: true
+      ignore_strapping_warning: true
     restore_mode: RESTORE_DEFAULT_OFF
 
 switch:
@@ -426,7 +427,6 @@ binary_sensor:
       number: ${button_a_gpio}
       mode: INPUT_PULLUP
       inverted: true
-      ignore_strapping_warning: true
     filters:
       - delayed_on: 15ms
       - delayed_off: 15ms
