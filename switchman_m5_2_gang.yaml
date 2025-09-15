@@ -44,10 +44,7 @@ substitutions:
 
   hold_start_ms: 200ms
   debounce_ms: 50ms
-  # Home Assistant entities used for optional peer LED sync.
-  # Default to self, so no external entity is required unless you override them.
-  peer_button_a_entity: "switch.${device_name}_button_a_state"
-  peer_button_b_entity: "switch.${device_name}_button_b_state"
+  # Optional peer LED sync is configured via an extra package.
 
 esphome:
   name: "${device_name}"
@@ -107,6 +104,14 @@ globals:
     restore_value: false
     initial_value: "false"
   - id: button_b_suppress
+    type: bool
+    restore_value: false
+    initial_value: "false"
+  - id: peer_a_on
+    type: bool
+    restore_value: false
+    initial_value: "false"
+  - id: peer_b_on
     type: bool
     restore_value: false
     initial_value: "false"
@@ -251,7 +256,7 @@ switch:
       # Update indicator based on local OR peer state
       - if:
           condition:
-            lambda: 'return id(button_a_state).state || id(peer_a_state).state;'
+            lambda: 'return id(button_a_state).state || id(peer_a_on);'
           then:
             - light.turn_on: blue_led
           else:
@@ -277,7 +282,7 @@ switch:
       # Update indicator based on local OR peer state
       - if:
           condition:
-            lambda: 'return id(button_a_state).state || id(peer_a_state).state;'
+            lambda: 'return id(button_a_state).state || id(peer_a_on);'
           then:
             - light.turn_on: blue_led
           else:
@@ -309,7 +314,7 @@ switch:
       # Update indicator based on local OR peer state
       - if:
           condition:
-            lambda: 'return id(button_b_state).state || id(peer_b_state).state;'
+            lambda: 'return id(button_b_state).state || id(peer_b_on);'
           then:
             - switch.turn_on: red_led
           else:
@@ -335,7 +340,7 @@ switch:
       # Update indicator based on local OR peer state
       - if:
           condition:
-            lambda: 'return id(button_b_state).state || id(peer_b_state).state;'
+            lambda: 'return id(button_b_state).state || id(peer_b_on);'
           then:
             - switch.turn_on: red_led
           else:
@@ -456,34 +461,7 @@ binary_sensor:
           then:
             - switch.toggle: button_b_state
 
-  # Reflect peer button states (via Home Assistant) on the device indicator LEDs
-  - platform: homeassistant
-    id: peer_a_state
-    entity_id: ${peer_button_a_entity}
-    internal: true
-    on_state:
-      then:
-        - if:
-            condition:
-              lambda: 'return id(peer_a_state).state || id(button_a_state).state;'
-            then:
-              - light.turn_on: blue_led
-            else:
-              - light.turn_off: blue_led
-
-  - platform: homeassistant
-    id: peer_b_state
-    entity_id: ${peer_button_b_entity}
-    internal: true
-    on_state:
-      then:
-        - if:
-            condition:
-              lambda: 'return id(peer_b_state).state || id(button_b_state).state;'
-            then:
-              - switch.turn_on: red_led
-            else:
-              - switch.turn_off: red_led
+  # Peer LED sync is provided by an optional package.
 
 script:
   - id: a_hold_blink

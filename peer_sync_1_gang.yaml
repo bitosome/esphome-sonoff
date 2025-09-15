@@ -1,0 +1,20 @@
+substitutions:
+  # Set to the other device's HA entity id, e.g. switch.room_switch_2_button_a_state
+  peer_button_entity: ""
+
+binary_sensor:
+  - platform: homeassistant
+    id: peer_a_source
+    entity_id: ${peer_button_entity}
+    internal: true
+    on_state:
+      then:
+        - lambda: 'id(peer_a_on) = id(peer_a_source).state;'
+        - if:
+            condition:
+              lambda: 'return id(button_a_state).state || id(peer_a_on);'
+            then:
+              - switch.turn_on: red_led
+            else:
+              - switch.turn_off: red_led
+
