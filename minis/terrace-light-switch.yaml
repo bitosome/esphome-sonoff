@@ -1,8 +1,7 @@
 substitutions:
-  device_friendly_name: "WC 2 light switch 1"
-  device_name: "wc-2-light-switch-1"
+  device_friendly_name: "Terrace light switch"
+  device_name: "terrace-light-switch"
 
-  # Slave forwards actions to the master. Leave empty for "slave" role
   button_a_on_service: ""
   button_a_on_entity: ""
 
@@ -11,13 +10,11 @@ substitutions:
 
   button_a_hold_service: ""
   button_a_hold_entity: ""
-  hold_start_ms: 500ms
 
-  default_mode_a: "Decoupled"
+  default_mode_a: "Coupled"
   default_relay_a_target_mode: "Off"
-  role: "slave"
-  master_entity_base: "wc_2_light_switch_2"
 
+  device_ip: ""
 
 packages:
   remote_package:

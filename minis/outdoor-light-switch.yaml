@@ -1,0 +1,37 @@
+substitutions:
+  device_friendly_name: "Outdoor light switch"
+  device_name: "outdoor-light-switch"
+
+  button_a_on_service: "switch.turn_on"
+  button_a_on_entity: "switch.outdoors_light_group"
+
+  button_a_off_service: "switch.turn_off"
+  button_a_off_entity: "switch.outdoors_light_group"
+
+  button_a_hold_service: ""
+  button_a_hold_entity: ""
+
+  default_mode_a: "Coupled"
+  default_relay_a_target_mode: "Off"
+
+  button_b_on_service: "scene.turn_on"
+  button_b_on_entity: "scene.not_at_home"
+
+  button_b_off_service: "scene.turn_on"
+  button_b_off_entity: "scene.at_home"
+
+  button_b_hold_service: "switch.toggle"
+  button_b_hold_entity: "switch.robot_vacuum_cleaner_switch"
+
+  default_mode_b: "Decoupled"
+  default_relay_b_target_mode: "Off"
+
+  device_ip: ""
+
+packages:
+  remote_package:
+    url: https://github.com/bitosome/esphome-sonoff
+    ref: main
+    files:
+      - switchman_m5_2_gang.yaml
+    refresh: 0s

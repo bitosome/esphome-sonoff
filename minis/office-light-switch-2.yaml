@@ -1,21 +1,20 @@
 substitutions:
-  device_friendly_name: "WC 2 light switch 2"
-  device_name: "wc-2-light-switch-2"
+  device_friendly_name: "Office light switch 2"
+  device_name: "office-light-switch-2"
 
   button_a_on_service: ""
   button_a_on_entity: ""
 
   button_a_off_service: ""
   button_a_off_entity: ""
-
-  button_a_hold_service: "switch.turn_off"
-  button_a_hold_entity: "switch.wc_2_light_group"
-  hold_start_ms: 500ms
+  
+  button_a_hold_service: "switch.toggle"
+  button_a_hold_entity: "switch.office_light_switch_1_button_a_state"
 
   default_mode_a: "Coupled"
   default_relay_a_target_mode: "Off"
-  role: "master"
 
+  device_ip: ""
 
 packages:
   remote_package:

@@ -1,0 +1,25 @@
+substitutions:
+  device_friendly_name: "Bedroom light switch"
+  device_name: "bedroom-light-switch"
+
+  button_a_on_service: "light.turn_on"
+  button_a_on_entity: "light.ikea_tradfri_e27_led_bulb_3"
+  button_a_off_service: "light.turn_off"
+  button_a_off_entity: "light.ikea_tradfri_e27_led_bulb_3"
+
+  button_a_hold_service: "light.turn_off"
+  button_a_hold_entity: "light.bedroom_lights"
+  hold_start_ms: 500ms
+
+  default_mode_a: "Decoupled"
+  default_relay_a_target_mode: "On"
+  role: "master"
+
+
+packages:
+  remote_package:
+    url: https://github.com/bitosome/esphome-sonoff
+    ref: main
+    files:
+      - switchman_m5_1_gang.yaml
+    refresh: 0s

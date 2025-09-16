@@ -3,7 +3,7 @@ substitutions:
   device_name: "switchman-m5-2g"
   device_make: "Sonoff"
   device_model: "Switchman M5 (2-Gang)"
-  package_version: "4.0.0"
+  package_version: "4.0.1"
 
   wifi_ssid: !secret wifi_ssid
   wifi_password: !secret wifi_password
@@ -41,9 +41,8 @@ substitutions:
   default_mode_b: "Coupled"
   default_relay_b_target_mode: "Off"
 
-  hold_start_ms: 200ms
+  hold_start_ms: 500ms
   debounce_ms: 50ms
-  # Optional peer LED sync is configured via an extra package.
 
   # Walkthrough Master/Slave role configuration
   # Possible values: "master" or "slave"
@@ -52,8 +51,8 @@ substitutions:
   # Example: master_entity_base: "wc_2_light_switch_2"
   master_entity_base: ""
   # Derived master entities used for forwarding and mirroring (can be overridden in minis if desired)
-  master_button_a_entity: "switch.${master_entity_base}_button_a_state"
-  master_button_b_entity: "switch.${master_entity_base}_button_b_state"
+  master_button_a_entity: "light.${master_entity_base}_button_a_state"
+  master_button_b_entity: "light.${master_entity_base}_button_b_state"
   master_button_a_hold_entity: "button.${master_entity_base}_button_a_hold_action"
   master_button_b_hold_entity: "button.${master_entity_base}_button_b_hold_action"
 
@@ -149,6 +148,7 @@ light:
       inverted: true
       ignore_strapping_warning: true
     restore_mode: RESTORE_DEFAULT_OFF
+
 
 switch:
   - platform: gpio
@@ -356,8 +356,8 @@ binary_sensor:
       mode: INPUT_PULLUP
       inverted: true
     filters:
-      - delayed_on: 15ms
-      - delayed_off: 15ms
+      - delayed_on: ${debounce_ms}
+      - delayed_off: ${debounce_ms}
     on_press:
       - lambda: "id(a_hold_triggered) = false;"
       - script.execute: a_hold_check
@@ -371,7 +371,7 @@ binary_sensor:
                   lambda: 'return std::string("${role}") == std::string("slave") && std::string("${master_button_a_entity}") != std::string("");'
                 then:
                   - homeassistant.service:
-                      service: switch.toggle
+                      service: light.toggle
                       data:
                         entity_id: "${master_button_a_entity}"
                 else:
@@ -385,8 +385,8 @@ binary_sensor:
       inverted: true
       ignore_strapping_warning: true
     filters:
-      - delayed_on: 15ms
-      - delayed_off: 15ms
+      - delayed_on: ${debounce_ms}
+      - delayed_off: ${debounce_ms}
     on_press:
       - lambda: "id(b_hold_triggered) = false;"
       - script.execute: b_hold_check
@@ -400,7 +400,7 @@ binary_sensor:
                   lambda: 'return std::string("${role}") == std::string("slave") && std::string("${master_button_b_entity}") != std::string("");'
                 then:
                   - homeassistant.service:
-                      service: switch.toggle
+                      service: light.toggle
                       data:
                         entity_id: "${master_button_b_entity}"
                 else:

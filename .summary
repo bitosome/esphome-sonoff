@@ -8,6 +8,7 @@ Overview
   - minis/wc-2-light-switch-1.yaml: Mini config (slave) for room “WC 2” switch 1.
   - minis/wc-2-light-switch-2.yaml: Mini config (master) for room “WC 2” switch 2.
   - secrets.yaml: Local placeholder secrets used for lint/validation.
+  - Removed: peer_sync_1_gang.yaml and peer_sync_2_gang.yaml (obsolete; mirroring is built-in).
 
 Master/Slave mirroring (final design)
 - Goal: Make a “slave” switch behave as a remote extension of a “master”, while keeping both devices’ physical buttons, hold detection, HA entities, and LEDs in sync.
@@ -41,8 +42,19 @@ Minis (WC 2 switches)
   - No extra peer package required; mirroring is handled in base via master_entity_base.
   - File: minis/wc-2-light-switch-1.yaml:1
 
+Minis (Living room and Entrance)
+- living‑room‑light‑switch‑1 (master): role: "master", group hold action kept, no peer include.
+  - File: minis/living-room-light-switch-1.yaml:1
+- living‑room‑light‑switch‑2 (slave): role: "slave", master_entity_base: "living_room_light_switch_1", services empty.
+  - File: minis/living-room-light-switch-2.yaml:1
+- entrance‑light‑switch‑2 (master): role: "master", services empty, no peer include.
+  - File: minis/entrance-light-switch-2.yaml:1
+- entrance‑light‑switch‑1 (slave): role: "slave", master_entity_base: "entrance_light_switch_2", services empty.
+  - File: minis/entrance-light-switch-1.yaml:1
+
 Hold timing and debounce
-- To reduce accidental holds, minis set hold_start_ms: 500ms. If false holds persist, raise to 600–700ms.
+- Global default hold_start_ms: 500ms (changed from 200ms). Minis can omit unless they need a different value.
+- If false holds persist, raise to 600–700ms.
 - Optional (not yet changed): Increase GPIO debounce from 15ms to 25–30ms in base if buttons are noisy.
 
 Resource/diagnostic changes
@@ -70,6 +82,8 @@ Files and key inserts
   - Press/hold forwarding for slave via homeassistant.service.
   - Start of substitutions: switchman_m5_2_gang.yaml:1
   - Start of binary_sensor section: switchman_m5_2_gang.yaml:351
+  - Debounce now uses substitution ${debounce_ms} for button A/B filters.
+  - Blue LED remains a status_led light; “Button A/B state” remain internal template switches (forwarded as light.* via HA helpers).
 - minis/wc-2-light-switch-1.yaml (slave)
   - role: "slave", master_entity_base set, hold_start_ms: 500ms, Decoupled mode.
   - File start: minis/wc-2-light-switch-1.yaml:1
@@ -79,6 +93,11 @@ Files and key inserts
 - secrets.yaml (local dev only)
   - Added placeholder secrets to enable esphome config validation locally.
   - File: secrets.yaml:1
+
+Cleanup
+- Deleted peer_sync_1_gang.yaml and peer_sync_2_gang.yaml (no references remain).
+- Removed unused device_ip substitutions from minis (no longer used by base).
+- 2‑gang: Removed obsolete api_key substitution (encryption removed earlier).
 
 Linting and validation
 - Added local venv and installed yamllint + esphome CLI.

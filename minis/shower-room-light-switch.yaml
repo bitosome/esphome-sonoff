@@ -1,0 +1,37 @@
+substitutions:
+  device_friendly_name: "Shower room light switch"
+  device_name: "shower-room-light-switch"
+
+  button_a_on_service: "switch.turn_on"
+  button_a_on_entity: "switch.shower_room_ceiling_light_switch"
+
+  button_a_off_service: "switch.turn_off"
+  button_a_off_entity: "switch.shower_room_ceiling_light_switch"
+
+  button_a_hold_service: ""
+  button_a_hold_entity: ""
+
+  default_mode_a: "Decoupled"
+  default_relay_a_target_mode: "On"
+
+  button_b_on_service: ""
+  button_b_on_entity: ""
+
+  button_b_off_service: ""
+  button_b_off_entity: ""
+
+  button_b_hold_service: ""
+  button_b_hold_entity: ""
+
+  default_mode_b: "Coupled"
+  default_relay_b_target_mode: "Off"
+
+  device_ip: ""
+
+packages:
+  remote_package:
+    url: https://github.com/bitosome/esphome-sonoff
+    ref: main
+    files:
+      - switchman_m5_2_gang.yaml
+    refresh: 0s
