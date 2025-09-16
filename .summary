@@ -26,6 +26,11 @@ Master/Slave mirroring (final design)
     - Update peer_*_on flags (used by LED logic that shows local OR peer state).
     - Synchronize the slave’s local template switch button_*_state so both HA entities show the same state.
 
+Button State Domain in HA
+- Default is switch.*: `master_button_*_entity` uses the switch domain (e.g., `switch.<base>_button_a_state`).
+- If you want light.* in HA: create “Switch as Light” helpers for each master’s Button A/B state and optionally override `master_button_*_entity` in minis to target those light entities.
+- Rationale: We keep robust internal template switches in firmware; HA can present them as lights without changing device logic.
+
 Behavior summary
 - Physical button press detection: Active on both master and slave (GPIO binary_sensors). Slave forwards the logical action to the master.
 - Physical hold detection: Active on both. Slave forwards hold to master’s hold entity (no action executed locally on slave).

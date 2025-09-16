@@ -37,7 +37,7 @@ substitutions:
   # Example: master_entity_base: "wc_2_light_switch_2"
   master_entity_base: ""
   # Derived master entities used for forwarding and mirroring (can be overridden in minis if desired)
-  master_button_a_entity: "light.${master_entity_base}_button_a_state"
+  master_button_a_entity: "switch.${master_entity_base}_button_a_state"
   master_button_a_hold_entity: "button.${master_entity_base}_button_a_hold_action"
 
 esphome:
@@ -239,7 +239,7 @@ binary_sensor:
                   lambda: 'return std::string("${role}") == std::string("slave") && std::string("${master_button_a_entity}") != std::string("");'
                 then:
                   - homeassistant.service:
-                      service: light.toggle
+                      service: switch.toggle
                       data:
                         entity_id: "${master_button_a_entity}"
                 else:
