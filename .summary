@@ -1,0 +1,122 @@
+Project summary and changes (ESPHome Sonoff Switchman M5)
+
+Overview
+- Purpose: Maintain ESPHome configs for Sonoff Switchman M5 1‑Gang and 2‑Gang devices, plus per‑device mini files that include a shared base from this repo (or remote) and set device‑specific substitutions.
+- Core files:
+  - switchman_m5_1_gang.yaml: Base config for 1‑gang devices.
+  - switchman_m5_2_gang.yaml: Base config for 2‑gang devices.
+  - minis/wc-2-light-switch-1.yaml: Mini config (slave) for room “WC 2” switch 1.
+  - minis/wc-2-light-switch-2.yaml: Mini config (master) for room “WC 2” switch 2.
+  - secrets.yaml: Local placeholder secrets used for lint/validation.
+
+Master/Slave mirroring (final design)
+- Goal: Make a “slave” switch behave as a remote extension of a “master”, while keeping both devices’ physical buttons, hold detection, HA entities, and LEDs in sync.
+- Additions to base files (1‑gang and 2‑gang):
+  - substitutions:
+    - role: "master" | "slave" (default master)
+    - master_entity_base: "" (set only on slaves) — e.g. wc_2_light_switch_2
+    - Derived master entities (can be overridden if needed):
+      - 1‑gang: master_button_a_entity, master_button_a_hold_entity
+      - 2‑gang: master_button_a_entity, master_button_b_entity, master_button_a_hold_entity, master_button_b_hold_entity
+  - Forwarding (slave only):
+    - On button release: call homeassistant service switch.toggle on the master’s button_*_state.
+    - On hold: call homeassistant service button.press on the master’s hold entity.
+  - Mirroring proxies (slave only): homeassistant binary_sensors subscribe to the master’s button_*_state and:
+    - Update peer_*_on flags (used by LED logic that shows local OR peer state).
+    - Synchronize the slave’s local template switch button_*_state so both HA entities show the same state.
+
+Behavior summary
+- Physical button press detection: Active on both master and slave (GPIO binary_sensors). Slave forwards the logical action to the master.
+- Physical hold detection: Active on both. Slave forwards hold to master’s hold entity (no action executed locally on slave).
+- HA state entities: Master’s button_*_state drives true state; slave mirrors it via the proxy; both appear identical in HA.
+- LEDs: Driven by “local OR peer” logic; with proxies updating peer_*_on and local button_*_state, both devices’ LEDs stay in lockstep.
+- HA dependency: If HA is down, slave cannot forward actions to master; master continues to work locally.
+
+Minis (WC 2 switches)
+- wc‑2‑light‑switch‑2 (master):
+  - substitutions: role: "master", hold_start_ms: 500ms; keeps hold action to turn off group switch.wc_2_light_group.
+  - File: minis/wc-2-light-switch-2.yaml:1
+- wc‑2‑light‑switch‑1 (slave):
+  - substitutions: role: "slave", master_entity_base: "wc_2_light_switch_2", hold_start_ms: 500ms, default_mode_a: "Decoupled".
+  - No extra peer package required; mirroring is handled in base via master_entity_base.
+  - File: minis/wc-2-light-switch-1.yaml:1
+
+Hold timing and debounce
+- To reduce accidental holds, minis set hold_start_ms: 500ms. If false holds persist, raise to 600–700ms.
+- Optional (not yet changed): Increase GPIO debounce from 15ms to 25–30ms in base if buttons are noisy.
+
+Resource/diagnostic changes
+- 2‑gang base (switchman_m5_2_gang.yaml):
+  - Removed high‑cost/diagnostic sensors and on_boot CPU code; removed API encryption section (api: kept without encryption block).
+  - Strapping warnings: keep for Blue LED (GPIO05) and Button B (GPIO15); removed for Button A (GPIO04) after verification.
+  - File starts: switchman_m5_2_gang.yaml:1
+- 1‑gang base (switchman_m5_1_gang.yaml):
+  - No heavy diagnostics existed; left logger at WARN (baud 0). Mirrors added as above.
+- Optional (not applied uniformly):
+  - Disable logger entirely for lowest RAM/CPU.
+  - Enable wifi power_save_mode: light (currently none).
+  - Keep allow_anonymous false if using MQTT broker; prefer TLS if exposed.
+
+Files and key inserts
+- switchman_m5_1_gang.yaml
+  - Added master_entity_base and derived master entities in substitutions.
+  - Added HA proxy binary_sensor to mirror master (updates peer flag, syncs local button state in slave mode).
+  - Press/hold forwarding for slave via homeassistant.service.
+  - Start of substitutions: switchman_m5_1_gang.yaml:1
+  - Start of binary_sensor section: switchman_m5_1_gang.yaml:140
+- switchman_m5_2_gang.yaml
+  - Added master_entity_base and derived A/B master entities in substitutions.
+  - Added HA proxies for A and B.
+  - Press/hold forwarding for slave via homeassistant.service.
+  - Start of substitutions: switchman_m5_2_gang.yaml:1
+  - Start of binary_sensor section: switchman_m5_2_gang.yaml:351
+- minis/wc-2-light-switch-1.yaml (slave)
+  - role: "slave", master_entity_base set, hold_start_ms: 500ms, Decoupled mode.
+  - File start: minis/wc-2-light-switch-1.yaml:1
+- minis/wc-2-light-switch-2.yaml (master)
+  - role: "master", hold_start_ms: 500ms, group off hold service retained.
+  - File start: minis/wc-2-light-switch-2.yaml:1
+- secrets.yaml (local dev only)
+  - Added placeholder secrets to enable esphome config validation locally.
+  - File: secrets.yaml:1
+
+Linting and validation
+- Added local venv and installed yamllint + esphome CLI.
+- Fixed lint issues:
+  - switchman_m5_1_gang.yaml: removed extra blank lines in binary_sensor/Script boundary.
+  - switchman_m5_2_gang.yaml: removed a trailing space in GPIO pin block.
+- esphome config:
+  - Base files validate locally (with placeholder secrets).
+  - Minis require either minis/secrets.yaml or pointing to local package files for offline validation; with remote_package they fetch this repo and look for secrets relative to the working tree.
+
+Operational notes
+- Slave‑only hold service definitions: If a hold service is set in the slave mini but not on the master, holds forwarded to the master’s hold entity result in a no‑op (safe, but nothing happens). Configure the hold action on the master to define behavior.
+- Failure modes: If HA or master is offline, slave cannot control master; LEDs and mirrored state will also stop updating from HA proxies.
+- Master defaults: Keep master’s default_mode_* as "Coupled" so its physical button drives the relay; slave as "Decoupled" to avoid driving local relays.
+
+Broker investigation (context from session)
+- Observed Mosquitto auth storms. Top client: mqttjs_40e8cc84 failing authorization; source appears as 172.30.32.1 (Supervisor Docker gateway NAT). This indicates a LAN client using MQTT.js with bad creds hitting 192.168.0.13:1883 (not an HA add‑on). Also saw SmartEVSE (192.168.0.234) failing auth.
+- Actions recommended:
+  - Fix SmartEVSE MQTT credentials/host.
+  - Identify MQTT.js client (script/tool) and correct creds. Optionally rotate broker user password to flush stale configs.
+  - For precise source IP, either enable tcpdump in SSH add‑on and sniff enp6s18 port 1883, or temporarily run Mosquitto in host network to see real LAN IPs in logs.
+
+Open follow‑ups / options
+- Consider raising hold_start_ms to 600–700ms, and/or increasing debounce to ~25–30ms.
+- Optionally standardize resource reductions (disable logger, wifi power save) across both bases.
+- If you need full two‑gang minis with the same single‑base approach, replicate master_entity_base for A/B.
+
+Quick usage (minis)
+- Master mini (1G):
+  substitutions:
+    role: "master"
+    hold_start_ms: 500ms
+    default_mode_a: "Coupled"
+    button_a_hold_service/entity: as desired (e.g. group off)
+- Slave mini (1G):
+  substitutions:
+    role: "slave"
+    master_entity_base: "<master_base>"  # e.g. wc_2_light_switch_2
+    hold_start_ms: 500ms  # or 600–700ms
+    default_mode_a: "Decoupled"
+  (No peer includes; mirroring is automatic.)

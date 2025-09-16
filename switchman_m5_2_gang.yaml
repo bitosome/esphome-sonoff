@@ -3,7 +3,7 @@ substitutions:
   device_name: "switchman-m5-2g"
   device_make: "Sonoff"
   device_model: "Switchman M5 (2-Gang)"
-  package_version: "3.2.0"
+  package_version: "4.0.0"
 
   wifi_ssid: !secret wifi_ssid
   wifi_password: !secret wifi_password
@@ -44,6 +44,18 @@ substitutions:
   hold_start_ms: 200ms
   debounce_ms: 50ms
   # Optional peer LED sync is configured via an extra package.
+
+  # Walkthrough Master/Slave role configuration
+  # Possible values: "master" or "slave"
+  role: "master"
+  # Simplified master reference for slaves
+  # Example: master_entity_base: "wc_2_light_switch_2"
+  master_entity_base: ""
+  # Derived master entities used for forwarding and mirroring (can be overridden in minis if desired)
+  master_button_a_entity: "switch.${master_entity_base}_button_a_state"
+  master_button_b_entity: "switch.${master_entity_base}_button_b_state"
+  master_button_a_hold_entity: "button.${master_entity_base}_button_a_hold_action"
+  master_button_b_hold_entity: "button.${master_entity_base}_button_b_hold_action"
 
 esphome:
   name: "${device_name}"
@@ -354,7 +366,16 @@ binary_sensor:
           condition:
             lambda: "return !id(a_hold_triggered);"
           then:
-            - switch.toggle: button_a_state
+            - if:
+                condition:
+                  lambda: 'return std::string("${role}") == std::string("slave") && std::string("${master_button_a_entity}") != std::string("");'
+                then:
+                  - homeassistant.service:
+                      service: switch.toggle
+                      data:
+                        entity_id: "${master_button_a_entity}"
+                else:
+                  - switch.toggle: button_a_state
 
   - platform: gpio
     id: button_b
@@ -374,9 +395,57 @@ binary_sensor:
           condition:
             lambda: "return !id(b_hold_triggered);"
           then:
-            - switch.toggle: button_b_state
+            - if:
+                condition:
+                  lambda: 'return std::string("${role}") == std::string("slave") && std::string("${master_button_b_entity}") != std::string("");'
+                then:
+                  - homeassistant.service:
+                      service: switch.toggle
+                      data:
+                        entity_id: "${master_button_b_entity}"
+                else:
+                  - switch.toggle: button_b_state
 
   # Peer LED sync is provided by an optional package.
+
+  # Mirror the master's A/B states into this device so HA state and LEDs follow master
+  - platform: homeassistant
+    id: master_a_state_proxy
+    entity_id: ${master_button_a_entity}
+    internal: true
+    on_state:
+      then:
+        - lambda: 'id(peer_a_on) = id(master_a_state_proxy).state;'
+        - if:
+            condition:
+              lambda: 'return std::string("${role}") == std::string("slave");'
+            then:
+              - if:
+                  condition:
+                    lambda: 'return id(master_a_state_proxy).state;'
+                  then:
+                    - switch.turn_on: button_a_state
+                  else:
+                    - switch.turn_off: button_a_state
+
+  - platform: homeassistant
+    id: master_b_state_proxy
+    entity_id: ${master_button_b_entity}
+    internal: true
+    on_state:
+      then:
+        - lambda: 'id(peer_b_on) = id(master_b_state_proxy).state;'
+        - if:
+            condition:
+              lambda: 'return std::string("${role}") == std::string("slave");'
+            then:
+              - if:
+                  condition:
+                    lambda: 'return id(master_b_state_proxy).state;'
+                  then:
+                    - switch.turn_on: button_b_state
+                  else:
+                    - switch.turn_off: button_b_state
 
 script:
   - id: a_hold_blink
@@ -406,7 +475,16 @@ script:
           then:
             - lambda: "id(a_hold_triggered) = true;"
             - script.execute: a_hold_blink
-            - button.press: button_a_sim_hold
+            - if:
+                condition:
+                  lambda: 'return std::string("${role}") == std::string("slave") && std::string("${master_button_a_hold_entity}") != std::string("");'
+                then:
+                  - homeassistant.service:
+                      service: button.press
+                      data:
+                        entity_id: "${master_button_a_hold_entity}"
+                else:
+                  - button.press: button_a_sim_hold
 
   - id: a_on_action
     then:
@@ -468,7 +546,16 @@ script:
           then:
             - lambda: "id(b_hold_triggered) = true;"
             - script.execute: b_hold_blink
-            - button.press: button_b_sim_hold
+            - if:
+                condition:
+                  lambda: 'return std::string("${role}") == std::string("slave") && std::string("${master_button_b_hold_entity}") != std::string("");'
+                then:
+                  - homeassistant.service:
+                      service: button.press
+                      data:
+                        entity_id: "${master_button_b_hold_entity}"
+                else:
+                  - button.press: button_b_sim_hold
 
   - id: b_on_action
     then:
