@@ -8,8 +8,8 @@ substitutions:
   button_a_off_service: ""
   button_a_off_entity: ""
 
-  button_a_hold_service: "switch.turn_off"
-  button_a_hold_entity: "switch.living_room_light_group"
+  button_a_hold_service: "light.turn_off"
+  button_a_hold_entity: "light.living_room_lights"
 
   default_mode_a: "Coupled"
   default_relay_a_target_mode: "Off"

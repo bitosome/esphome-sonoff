@@ -8,13 +8,11 @@ substitutions:
   button_a_off_service: ""
   button_a_off_entity: ""
   
-  button_a_hold_service: "switch.toggle"
-  button_a_hold_entity: "switch.office_light_switch_1_button_a_state"
+  button_a_hold_service: ""
+  button_a_hold_entity: ""
 
   default_mode_a: "Coupled"
   default_relay_a_target_mode: "Off"
-
-  device_ip: ""
 
 packages:
   remote_package:

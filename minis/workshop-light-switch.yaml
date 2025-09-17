@@ -14,8 +14,6 @@ substitutions:
   default_mode_a: "Coupled"
   default_relay_a_target_mode: "Off"
 
-  device_ip: ""
-
 packages:
   remote_package:
     url: https://github.com/bitosome/esphome-sonoff

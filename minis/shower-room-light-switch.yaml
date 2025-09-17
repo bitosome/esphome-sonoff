@@ -2,11 +2,11 @@ substitutions:
   device_friendly_name: "Shower room light switch"
   device_name: "shower-room-light-switch"
 
-  button_a_on_service: "switch.turn_on"
-  button_a_on_entity: "switch.shower_room_ceiling_light_switch"
+  button_a_on_service: "light.turn_on"
+  button_a_on_entity: "light.shower_room_ceiling_light"
 
-  button_a_off_service: "switch.turn_off"
-  button_a_off_entity: "switch.shower_room_ceiling_light_switch"
+  button_a_off_service: "light.turn_off"
+  button_a_off_entity: "light.shower_room_ceiling_light"
 
   button_a_hold_service: ""
   button_a_hold_entity: ""
@@ -25,8 +25,6 @@ substitutions:
 
   default_mode_b: "Coupled"
   default_relay_b_target_mode: "Off"
-
-  device_ip: ""
 
 packages:
   remote_package:
