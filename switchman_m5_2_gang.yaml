@@ -3,7 +3,7 @@ substitutions:
   device_name: "switchman-m5-2g"
   device_make: "Sonoff"
   device_model: "Switchman M5 (2-Gang)"
-  package_version: "4.0.1"
+  package_version: "4.0.2"
 
   wifi_ssid: !secret wifi_ssid
   wifi_password: !secret wifi_password
@@ -408,44 +408,63 @@ binary_sensor:
 
   # Peer LED sync is provided by an optional package.
 
+text_sensor:
   # Mirror the master's A/B states into this device so HA state and LEDs follow master
   - platform: homeassistant
     id: master_a_state_proxy
     entity_id: ${master_button_a_entity}
     internal: true
-    on_state:
+    on_value:
       then:
-        - lambda: 'id(peer_a_on) = id(master_a_state_proxy).state;'
-        - if:
-            condition:
-              lambda: 'return std::string("${role}") == std::string("slave");'
-            then:
-              - if:
-                  condition:
-                    lambda: 'return id(master_a_state_proxy).state;'
-                  then:
-                    - switch.turn_on: button_a_state
-                  else:
-                    - switch.turn_off: button_a_state
+        - lambda: |-
+            if (std::string("${role}") != "slave" || std::string("${master_button_a_entity}") == std::string("")) {
+              return;
+            }
+            const std::string value(x);
+            if (value != "on" && value != "off") {
+              ESP_LOGW("master_sync", "Ignoring Button A state '%s' from master", value.c_str());
+              return;
+            }
+            const bool is_on = (value == "on");
+            id(peer_a_on) = is_on;
+            if (id(button_a_state).state == is_on) {
+              return;
+            }
+            id(button_a_suppress) = true;
+            if (is_on) {
+              id(button_a_state).turn_on();
+            } else {
+              id(button_a_state).turn_off();
+            }
+            id(button_a_suppress) = false;
 
   - platform: homeassistant
     id: master_b_state_proxy
     entity_id: ${master_button_b_entity}
     internal: true
-    on_state:
+    on_value:
       then:
-        - lambda: 'id(peer_b_on) = id(master_b_state_proxy).state;'
-        - if:
-            condition:
-              lambda: 'return std::string("${role}") == std::string("slave");'
-            then:
-              - if:
-                  condition:
-                    lambda: 'return id(master_b_state_proxy).state;'
-                  then:
-                    - switch.turn_on: button_b_state
-                  else:
-                    - switch.turn_off: button_b_state
+        - lambda: |-
+            if (std::string("${role}") != "slave" || std::string("${master_button_b_entity}") == std::string("")) {
+              return;
+            }
+            const std::string value(x);
+            if (value != "on" && value != "off") {
+              ESP_LOGW("master_sync", "Ignoring Button B state '%s' from master", value.c_str());
+              return;
+            }
+            const bool is_on = (value == "on");
+            id(peer_b_on) = is_on;
+            if (id(button_b_state).state == is_on) {
+              return;
+            }
+            id(button_b_suppress) = true;
+            if (is_on) {
+              id(button_b_state).turn_on();
+            } else {
+              id(button_b_state).turn_off();
+            }
+            id(button_b_suppress) = false;
 
 script:
   - id: a_hold_blink
@@ -467,6 +486,7 @@ script:
       - light.turn_off: blue_led
 
   - id: a_hold_check
+    mode: restart
     then:
       - delay: ${hold_start_ms}
       - if:
@@ -538,6 +558,7 @@ script:
       - light.turn_off: blue_led
 
   - id: b_hold_check
+    mode: restart
     then:
       - delay: ${hold_start_ms}
       - if:
