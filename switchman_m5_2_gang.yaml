@@ -179,53 +179,59 @@ switch:
           condition:
             lambda: "return id(button_a_busy);"
           then:
-            - switch.toggle: button_a_state
-      - lambda: "id(button_a_busy) = true;"
-      # Update indicator based on local OR peer state
-      - if:
-          condition:
-            lambda: 'return id(button_a_state).state || id(peer_a_on);'
-          then:
-            - light.turn_on: blue_led
+            - logger.log:
+                level: WARN
+                format: "[button_a] Ignoring re-entrant turn_on while busy"
           else:
-            - light.turn_off: blue_led
-      - if:
-          condition:
-            lambda: 'return !id(button_a_suppress);'
-          then:
-            - script.execute: a_on_action
+            - lambda: "id(button_a_busy) = true;"
+            # Update indicator based on local OR peer state
             - if:
                 condition:
-                  lambda: 'return id(mode_a).state == std::string("Coupled") && id(relay_a).state == false;'
+                  lambda: 'return id(button_a_state).state || id(peer_a_on);'
                 then:
-                  - switch.turn_on: relay_a
-      - lambda: "id(button_a_busy) = false;"
+                  - light.turn_on: blue_led
+                else:
+                  - light.turn_off: blue_led
+            - if:
+                condition:
+                  lambda: 'return !id(button_a_suppress);'
+                then:
+                  - script.execute: a_on_action
+                  - if:
+                      condition:
+                        lambda: 'return id(mode_a).state == std::string("Coupled") && id(relay_a).state == false;'
+                      then:
+                        - switch.turn_on: relay_a
+            - lambda: "id(button_a_busy) = false;"
     on_turn_off:
       - if:
           condition:
             lambda: "return id(button_a_busy);"
           then:
-            - switch.toggle: button_a_state
-      - lambda: "id(button_a_busy) = true;"
-      # Update indicator based on local OR peer state
-      - if:
-          condition:
-            lambda: 'return id(button_a_state).state || id(peer_a_on);'
-          then:
-            - light.turn_on: blue_led
+            - logger.log:
+                level: WARN
+                format: "[button_a] Ignoring re-entrant turn_off while busy"
           else:
-            - light.turn_off: blue_led
-      - if:
-          condition:
-            lambda: 'return !id(button_a_suppress);'
-          then:
-            - script.execute: a_off_action
+            - lambda: "id(button_a_busy) = true;"
+            # Update indicator based on local OR peer state
             - if:
                 condition:
-                  lambda: 'return id(mode_a).state == std::string("Coupled") && id(relay_a).state == true;'
+                  lambda: 'return id(button_a_state).state || id(peer_a_on);'
                 then:
-                  - switch.turn_off: relay_a
-      - lambda: "id(button_a_busy) = false;"
+                  - light.turn_on: blue_led
+                else:
+                  - light.turn_off: blue_led
+            - if:
+                condition:
+                  lambda: 'return !id(button_a_suppress);'
+                then:
+                  - script.execute: a_off_action
+                  - if:
+                      condition:
+                        lambda: 'return id(mode_a).state == std::string("Coupled") && id(relay_a).state == true;'
+                      then:
+                        - switch.turn_off: relay_a
+            - lambda: "id(button_a_busy) = false;"
 
   - platform: template
     name: "Button B state"
@@ -237,53 +243,59 @@ switch:
           condition:
             lambda: "return id(button_b_busy);"
           then:
-            - switch.toggle: button_b_state
-      - lambda: "id(button_b_busy) = true;"
-      # Update indicator based on local OR peer state
-      - if:
-          condition:
-            lambda: 'return id(button_b_state).state || id(peer_b_on);'
-          then:
-            - switch.turn_on: red_led
+            - logger.log:
+                level: WARN
+                format: "[button_b] Ignoring re-entrant turn_on while busy"
           else:
-            - switch.turn_off: red_led
-      - if:
-          condition:
-            lambda: 'return !id(button_b_suppress);'
-          then:
-            - script.execute: b_on_action
+            - lambda: "id(button_b_busy) = true;"
+            # Update indicator based on local OR peer state
             - if:
                 condition:
-                  lambda: 'return id(mode_b).state == std::string("Coupled") && id(relay_b).state == false;'
+                  lambda: 'return id(button_b_state).state || id(peer_b_on);'
                 then:
-                  - switch.turn_on: relay_b
-      - lambda: "id(button_b_busy) = false;"
+                  - switch.turn_on: red_led
+                else:
+                  - switch.turn_off: red_led
+            - if:
+                condition:
+                  lambda: 'return !id(button_b_suppress);'
+                then:
+                  - script.execute: b_on_action
+                  - if:
+                      condition:
+                        lambda: 'return id(mode_b).state == std::string("Coupled") && id(relay_b).state == false;'
+                      then:
+                        - switch.turn_on: relay_b
+            - lambda: "id(button_b_busy) = false;"
     on_turn_off:
       - if:
           condition:
             lambda: "return id(button_b_busy);"
           then:
-            - switch.toggle: button_b_state
-      - lambda: "id(button_b_busy) = true;"
-      # Update indicator based on local OR peer state
-      - if:
-          condition:
-            lambda: 'return id(button_b_state).state || id(peer_b_on);'
-          then:
-            - switch.turn_on: red_led
+            - logger.log:
+                level: WARN
+                format: "[button_b] Ignoring re-entrant turn_off while busy"
           else:
-            - switch.turn_off: red_led
-      - if:
-          condition:
-            lambda: 'return !id(button_b_suppress);'
-          then:
-            - script.execute: b_off_action
+            - lambda: "id(button_b_busy) = true;"
+            # Update indicator based on local OR peer state
             - if:
                 condition:
-                  lambda: 'return id(mode_b).state == std::string("Coupled") && id(relay_b).state == true;'
+                  lambda: 'return id(button_b_state).state || id(peer_b_on);'
                 then:
-                  - switch.turn_off: relay_b
-      - lambda: "id(button_b_busy) = false;"
+                  - switch.turn_on: red_led
+                else:
+                  - switch.turn_off: red_led
+            - if:
+                condition:
+                  lambda: 'return !id(button_b_suppress);'
+                then:
+                  - script.execute: b_off_action
+                  - if:
+                      condition:
+                        lambda: 'return id(mode_b).state == std::string("Coupled") && id(relay_b).state == true;'
+                      then:
+                        - switch.turn_off: relay_b
+            - lambda: "id(button_b_busy) = false;"
 
 select:
   - platform: template
