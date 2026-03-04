@@ -1,6 +1,6 @@
 substitutions:
-  device_friendly_name: "Switchman M5 1G"
-  device_name: "switchman-m5-1g"
+  device_friendly_name: "THP Experiment"
+  device_name: "thp-experiment"
   device_make: "Sonoff"
   device_model: "Switchman M5 (1-Gang, WS2812)"
   package_version: "5.0.0"
@@ -12,7 +12,6 @@ substitutions:
 
   button_a_gpio: GPIO00
   relay_a_gpio: GPIO23
-  # WS2812B modules use the same timing profile as WS2812 in ESPHome's ESP32 RMT driver.
   ws2812_data_gpio: GPIO18
   indicator_rgb_order: GRB
 
@@ -183,7 +182,6 @@ light:
   - platform: esp32_rmt_led_strip
     id: indicator_led
     internal: true
-    # Single WS2812B indicator LED on one data line.
     pin: ${ws2812_data_gpio}
     chipset: WS2812
     num_leds: 1

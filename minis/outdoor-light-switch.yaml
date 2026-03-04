@@ -2,29 +2,29 @@ substitutions:
   device_friendly_name: "Outdoor light switch"
   device_name: "outdoor-light-switch"
 
-  button_a_on_service: "light.turn_on"
-  button_a_on_entity: "light.exterior_lights"
+  channel_a_on_service: "light.turn_on"
+  channel_a_on_entity: "light.exterior_lights"
 
-  button_a_off_service: "light.turn_off"
-  button_a_off_entity: "light.exterior_lights"
+  channel_a_off_service: "light.turn_off"
+  channel_a_off_entity: "light.exterior_lights"
 
-  button_a_hold_service: ""
-  button_a_hold_entity: ""
+  channel_a_hold_service: ""
+  channel_a_hold_entity: ""
 
-  default_mode_a: "Coupled"
-  default_relay_a_target_mode: "Off"
+  default_channel_a_mode: "Coupled"
+  default_channel_a_relay_target_mode: "Off"
 
-  button_b_on_service: "scene.turn_on"
-  button_b_on_entity: "scene.not_at_home"
+  channel_b_on_service: "scene.turn_on"
+  channel_b_on_entity: "scene.not_at_home"
 
-  button_b_off_service: "scene.turn_on"
-  button_b_off_entity: "scene.at_home"
+  channel_b_off_service: "scene.turn_on"
+  channel_b_off_entity: "scene.at_home"
 
-  button_b_hold_service: "switch.toggle"
-  button_b_hold_entity: "switch.robot_vacuum_cleaner_switch"
+  channel_b_hold_service: "switch.toggle"
+  channel_b_hold_entity: "switch.robot_vacuum_cleaner_switch"
 
-  default_mode_b: "Decoupled"
-  default_relay_b_target_mode: "Off"
+  default_channel_b_mode: "Decoupled"
+  default_channel_b_relay_target_mode: "Off"
 
 packages:
   remote_package:

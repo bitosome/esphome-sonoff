@@ -2,8 +2,8 @@ substitutions:
   device_friendly_name: "Switchman M5 2G"
   device_name: "switchman-m5-2g"
   device_make: "Sonoff"
-  device_model: "Switchman M5 (2-Gang)"
-  package_version: "4.0.2"
+  device_model: "Switchman M5 (2-Gang, WS2812)"
+  package_version: "5.0.0"
 
   wifi_ssid: !secret wifi_ssid
   wifi_password: !secret wifi_password
@@ -14,58 +14,115 @@ substitutions:
   button_b_gpio: GPIO15
   relay_a_gpio: GPIO23
   relay_b_gpio: GPIO19
-  red_led_gpio: GPIO22
-  blue_led_gpio: GPIO05
+  # Two WS2812B modules are daisy-chained on this single data line.
+  ws2812_data_gpio: GPIO18
+  indicator_rgb_order: GRB
 
-  button_a_on_service: ""
-  button_a_on_entity: ""
+  indicator_a_on_profile:
+    state: true
+    brightness: 100%
+    red: 0%
+    green: 100%
+    blue: 0%
 
-  button_a_off_service: ""
-  button_a_off_entity: ""
+  indicator_a_connecting_profile:
+    state: true
+    brightness: 100%
+    red: 0%
+    green: 0%
+    blue: 100%
 
-  button_a_hold_service: ""
-  button_a_hold_entity: ""
+  indicator_a_hold_profile:
+    state: true
+    brightness: 100%
+    red: 0%
+    green: 0%
+    blue: 100%
 
-  default_mode_a: "Coupled"
-  default_relay_a_target_mode: "Off"
+  indicator_b_on_profile:
+    state: true
+    brightness: 100%
+    red: 0%
+    green: 100%
+    blue: 0%
 
-  button_b_on_service: ""
-  button_b_on_entity: ""
+  indicator_b_connecting_profile:
+    state: false
+    brightness: 100%
+    red: 0%
+    green: 0%
+    blue: 100%
 
-  button_b_off_service: ""
-  button_b_off_entity: ""
+  indicator_b_hold_profile:
+    state: true
+    brightness: 100%
+    red: 0%
+    green: 0%
+    blue: 100%
 
-  button_b_hold_service: ""
-  button_b_hold_entity: ""
+  indicator_animation_step: "0.08"
+  indicator_animation_tick: 120ms
 
-  default_mode_b: "Coupled"
-  default_relay_b_target_mode: "Off"
+  channel_a_on_service: ""
+  channel_a_on_entity: ""
+
+  channel_a_off_service: ""
+  channel_a_off_entity: ""
+
+  channel_a_hold_service: ""
+  channel_a_hold_entity: ""
+
+  default_channel_a_mode: "Coupled"
+  default_channel_a_relay_target_mode: "Off"
+
+  channel_b_on_service: ""
+  channel_b_on_entity: ""
+
+  channel_b_off_service: ""
+  channel_b_off_entity: ""
+
+  channel_b_hold_service: ""
+  channel_b_hold_entity: ""
+
+  default_channel_b_mode: "Coupled"
+  default_channel_b_relay_target_mode: "Off"
 
   hold_start_ms: 500ms
   debounce_ms: 50ms
 
-  # Walkthrough Master/Slave role configuration
-  # Possible values: "master" or "slave"
   role: "master"
-  # Simplified master reference for slaves
-  # Example: master_entity_base: "wc_2_light_switch_2"
   master_entity_base: ""
-  # Derived master entities used for forwarding and mirroring (can be overridden in minis if desired)
-  master_button_a_entity: "switch.${master_entity_base}_button_a_state"
-  master_button_b_entity: "switch.${master_entity_base}_button_b_state"
-  master_button_a_hold_entity: "button.${master_entity_base}_button_a_hold_action"
-  master_button_b_hold_entity: "button.${master_entity_base}_button_b_hold_action"
+  master_channel_a_state_entity: "switch.${master_entity_base}_channel_a_state"
+  master_channel_b_state_entity: "switch.${master_entity_base}_channel_b_state"
+  master_channel_a_hold_action_entity: "button.${master_entity_base}_channel_a_hold_action"
+  master_channel_b_hold_action_entity: "button.${master_entity_base}_channel_b_hold_action"
+
+  i2c_sda_gpio: GPIO03
+  i2c_scl_gpio: GPIO01
+  i2c_frequency: 100kHz
+  sht4x_address: "0x44"
+  sht4x_update_interval: 30s
 
 esphome:
   name: "${device_name}"
   friendly_name: "${device_friendly_name}"
   comment: "${device_model} by ${device_make} version ${package_version}"
+  on_boot:
+    - priority: -100
+      then:
+        - if:
+            condition:
+              lambda: 'return id(seed_indicator_profiles_on_boot);'
+            then:
+              - script.execute: seed_indicator_profiles
 
 esp32:
   board: esp32dev
   framework:
     type: arduino
     version: recommended
+    advanced:
+      minimum_chip_revision: "3.0"
 
 logger:
   level: WARN
@@ -78,85 +135,102 @@ wifi:
   ssid: ${wifi_ssid}
   password: ${wifi_password}
   power_save_mode: none
+  on_connect:
+    then:
+      - lambda: 'id(wifi_connected) = true;'
+      - script.execute: indicator_reset_animation
+      - script.execute: indicator_tick
+  on_disconnect:
+    then:
+      - lambda: 'id(wifi_connected) = false;'
+      - script.execute: indicator_reset_animation
+      - script.execute: indicator_tick
 
 ota:
   platform: esphome
   password: ${ota_password}
+  on_begin:
+    then:
+      - lambda: 'id(seed_indicator_profiles_on_boot) = true;'
 
 api:
+  homeassistant_services: true
+  homeassistant_states: true
 
 globals:
-  - id: a_hold_triggered
+  - id: channel_a_hold_triggered
     type: bool
     restore_value: false
     initial_value: "false"
-  - id: b_hold_triggered
+  - id: channel_b_hold_triggered
     type: bool
     restore_value: false
     initial_value: "false"
-  - id: button_a_busy
+  - id: channel_a_busy
     type: bool
     restore_value: false
     initial_value: "false"
-  - id: button_b_busy
+  - id: channel_b_busy
     type: bool
     restore_value: false
     initial_value: "false"
-  - id: button_a_suppress
+  - id: channel_a_suppress
     type: bool
     restore_value: false
     initial_value: "false"
-  - id: button_b_suppress
+  - id: channel_b_suppress
     type: bool
     restore_value: false
     initial_value: "false"
-  - id: peer_a_on
+  - id: channel_a_peer_on
     type: bool
     restore_value: false
     initial_value: "false"
-  - id: peer_b_on
+  - id: channel_b_peer_on
     type: bool
     restore_value: false
     initial_value: "false"
+  - id: wifi_connected
+    type: bool
+    restore_value: false
+    initial_value: "false"
+  - id: indicator_anim_level
+    type: float
+    restore_value: false
+    initial_value: "0.0"
+  - id: indicator_anim_rising
+    type: bool
+    restore_value: false
+    initial_value: "true"
+  - id: indicator_hold_phase
+    type: int
+    restore_value: false
+    initial_value: "0"
+  - id: seed_indicator_profiles_on_boot
+    type: bool
+    restore_value: true
+    initial_value: "true"
 
 button:
   - platform: restart
-    name: "Reboot Device"
+    name: "Reboot device"
     id: button_restart
     icon: mdi:power-cycle
-    entity_category: "diagnostic"
+    entity_category: diagnostic
 
   - platform: template
-    name: "Button A hold action"
-    id: button_a_sim_hold
+    name: "Channel A hold action"
+    id: channel_a_sim_hold
     on_press:
-      - script.execute: a_hold_action
+      - script.execute: channel_a_hold_action
 
   - platform: template
-    name: "Button B hold action"
-    id: button_b_sim_hold
+    name: "Channel B hold action"
+    id: channel_b_sim_hold
     on_press:
-      - script.execute: b_hold_action
-
-light:
-  - platform: status_led
-    name: "Blue LED"
-    id: blue_led
-    internal: true
-    pin:
-      number: ${blue_led_gpio}
-      inverted: true
-      ignore_strapping_warning: true
-    restore_mode: RESTORE_DEFAULT_OFF
-
+      - script.execute: channel_b_hold_action
 
 switch:
-  - platform: gpio
-    name: "Red LED"
-    id: red_led
-    internal: true
-    pin: ${red_led_gpio}
-
   - platform: gpio
     name: "Relay A"
     id: relay_a
@@ -170,154 +244,177 @@ switch:
     restore_mode: RESTORE_DEFAULT_OFF
 
   - platform: template
-    name: "Button A state"
-    id: button_a_state
+    name: "Channel A state"
+    id: channel_a_state
     optimistic: true
     restore_mode: RESTORE_DEFAULT_OFF
     on_turn_on:
-      - if:
-          condition:
-            lambda: "return id(button_a_busy);"
-          then:
-            - logger.log:
-                level: WARN
-                format: "[button_a] Ignoring re-entrant turn_on while busy"
-          else:
-            - lambda: "id(button_a_busy) = true;"
-            # Update indicator based on local OR peer state
-            - if:
-                condition:
-                  lambda: 'return id(button_a_state).state || id(peer_a_on);'
-                then:
-                  - light.turn_on: blue_led
-                else:
-                  - light.turn_off: blue_led
-            - if:
-                condition:
-                  lambda: 'return !id(button_a_suppress);'
-                then:
-                  - script.execute: a_on_action
-                  - if:
-                      condition:
-                        lambda: 'return id(mode_a).state == std::string("Coupled") && id(relay_a).state == false;'
-                      then:
-                        - switch.turn_on: relay_a
-            - lambda: "id(button_a_busy) = false;"
+      - script.execute:
+          id: channel_a_apply_state
+          target_state: true
     on_turn_off:
-      - if:
-          condition:
-            lambda: "return id(button_a_busy);"
-          then:
-            - logger.log:
-                level: WARN
-                format: "[button_a] Ignoring re-entrant turn_off while busy"
-          else:
-            - lambda: "id(button_a_busy) = true;"
-            # Update indicator based on local OR peer state
-            - if:
-                condition:
-                  lambda: 'return id(button_a_state).state || id(peer_a_on);'
-                then:
-                  - light.turn_on: blue_led
-                else:
-                  - light.turn_off: blue_led
-            - if:
-                condition:
-                  lambda: 'return !id(button_a_suppress);'
-                then:
-                  - script.execute: a_off_action
-                  - if:
-                      condition:
-                        lambda: 'return id(mode_a).state == std::string("Coupled") && id(relay_a).state == true;'
-                      then:
-                        - switch.turn_off: relay_a
-            - lambda: "id(button_a_busy) = false;"
+      - script.execute:
+          id: channel_a_apply_state
+          target_state: false
 
   - platform: template
-    name: "Button B state"
-    id: button_b_state
+    name: "Channel B state"
+    id: channel_b_state
     optimistic: true
     restore_mode: RESTORE_DEFAULT_OFF
     on_turn_on:
-      - if:
-          condition:
-            lambda: "return id(button_b_busy);"
-          then:
-            - logger.log:
-                level: WARN
-                format: "[button_b] Ignoring re-entrant turn_on while busy"
-          else:
-            - lambda: "id(button_b_busy) = true;"
-            # Update indicator based on local OR peer state
-            - if:
-                condition:
-                  lambda: 'return id(button_b_state).state || id(peer_b_on);'
-                then:
-                  - switch.turn_on: red_led
-                else:
-                  - switch.turn_off: red_led
-            - if:
-                condition:
-                  lambda: 'return !id(button_b_suppress);'
-                then:
-                  - script.execute: b_on_action
-                  - if:
-                      condition:
-                        lambda: 'return id(mode_b).state == std::string("Coupled") && id(relay_b).state == false;'
-                      then:
-                        - switch.turn_on: relay_b
-            - lambda: "id(button_b_busy) = false;"
+      - script.execute:
+          id: channel_b_apply_state
+          target_state: true
     on_turn_off:
-      - if:
-          condition:
-            lambda: "return id(button_b_busy);"
-          then:
-            - logger.log:
-                level: WARN
-                format: "[button_b] Ignoring re-entrant turn_off while busy"
-          else:
-            - lambda: "id(button_b_busy) = true;"
-            # Update indicator based on local OR peer state
-            - if:
-                condition:
-                  lambda: 'return id(button_b_state).state || id(peer_b_on);'
-                then:
-                  - switch.turn_on: red_led
-                else:
-                  - switch.turn_off: red_led
-            - if:
-                condition:
-                  lambda: 'return !id(button_b_suppress);'
-                then:
-                  - script.execute: b_off_action
-                  - if:
-                      condition:
-                        lambda: 'return id(mode_b).state == std::string("Coupled") && id(relay_b).state == true;'
-                      then:
-                        - switch.turn_off: relay_b
-            - lambda: "id(button_b_busy) = false;"
+      - script.execute:
+          id: channel_b_apply_state
+          target_state: false
+
+light:
+  - platform: esp32_rmt_led_strip
+    id: indicator_led
+    internal: true
+    # Both LEDs share one pad/pin: first LED DIN from this pin, first LED DOUT to second LED DIN.
+    pin: ${ws2812_data_gpio}
+    chipset: WS2812
+    num_leds: 2
+    rgb_order: ${indicator_rgb_order}
+    gamma_correct: 1.0
+    default_transition_length: 0s
+    restore_mode: RESTORE_DEFAULT_OFF
+
+  - platform: partition
+    id: indicator_a_led
+    internal: true
+    default_transition_length: 0s
+    restore_mode: RESTORE_DEFAULT_OFF
+    segments:
+      - id: indicator_led
+        from: 0
+        to: 0
+
+  - platform: partition
+    id: indicator_b_led
+    internal: true
+    default_transition_length: 0s
+    restore_mode: RESTORE_DEFAULT_OFF
+    segments:
+      - id: indicator_led
+        from: 1
+        to: 1
+
+  - platform: partition
+    name: "Channel A On LED Color Profile"
+    id: indicator_a_on_config
+    entity_category: config
+    icon: mdi:palette
+    default_transition_length: 0s
+    restore_mode: RESTORE_DEFAULT_ON
+    initial_state: ${indicator_a_on_profile}
+    on_state:
+      - script.execute: indicator_tick
+    segments:
+      - id: indicator_led
+        from: 0
+        to: 0
+
+  - platform: partition
+    name: "Channel A Connecting LED Color Profile"
+    id: indicator_a_connecting_config
+    entity_category: config
+    icon: mdi:palette
+    default_transition_length: 0s
+    restore_mode: RESTORE_DEFAULT_ON
+    initial_state: ${indicator_a_connecting_profile}
+    on_state:
+      - script.execute: indicator_tick
+    segments:
+      - id: indicator_led
+        from: 0
+        to: 0
+
+  - platform: partition
+    name: "Channel A Hold LED Color Profile"
+    id: indicator_a_hold_config
+    entity_category: config
+    icon: mdi:palette
+    default_transition_length: 0s
+    restore_mode: RESTORE_DEFAULT_ON
+    initial_state: ${indicator_a_hold_profile}
+    on_state:
+      - script.execute: indicator_tick
+    segments:
+      - id: indicator_led
+        from: 0
+        to: 0
+
+  - platform: partition
+    name: "Channel B On LED Color Profile"
+    id: indicator_b_on_config
+    entity_category: config
+    icon: mdi:palette
+    default_transition_length: 0s
+    restore_mode: RESTORE_DEFAULT_ON
+    initial_state: ${indicator_b_on_profile}
+    on_state:
+      - script.execute: indicator_tick
+    segments:
+      - id: indicator_led
+        from: 1
+        to: 1
+
+  - platform: partition
+    name: "Channel B Connecting LED Color Profile"
+    id: indicator_b_connecting_config
+    entity_category: config
+    icon: mdi:palette
+    default_transition_length: 0s
+    restore_mode: RESTORE_DEFAULT_OFF
+    initial_state: ${indicator_b_connecting_profile}
+    on_state:
+      - script.execute: indicator_tick
+    segments:
+      - id: indicator_led
+        from: 1
+        to: 1
+
+  - platform: partition
+    name: "Channel B Hold LED Color Profile"
+    id: indicator_b_hold_config
+    entity_category: config
+    icon: mdi:palette
+    default_transition_length: 0s
+    restore_mode: RESTORE_DEFAULT_ON
+    initial_state: ${indicator_b_hold_profile}
+    on_state:
+      - script.execute: indicator_tick
+    segments:
+      - id: indicator_led
+        from: 1
+        to: 1
 
 select:
   - platform: template
-    id: mode_a
-    name: "Button A mode"
+    id: channel_a_mode
+    name: "Channel A mode"
     options:
       - "Coupled"
       - "Decoupled"
     optimistic: true
     restore_value: true
-    initial_option: ${default_mode_a}
+    initial_option: ${default_channel_a_mode}
     entity_category: config
 
   - platform: template
-    id: mode_b
-    name: "Button B mode"
+    id: channel_b_mode
+    name: "Channel B mode"
     options:
       - "Coupled"
       - "Decoupled"
     optimistic: true
     restore_value: true
-    initial_option: ${default_mode_b}
+    initial_option: ${default_channel_b_mode}
     entity_category: config
 
   - platform: template
@@ -328,13 +425,13 @@ select:
       - "Off"
     optimistic: true
     restore_value: true
-    initial_option: ${default_relay_a_target_mode}
+    initial_option: ${default_channel_a_relay_target_mode}
     entity_category: config
     on_value:
       then:
         - if:
             condition:
-              lambda: 'return id(relay_a_target_mode).state == std::string("On");'
+              lambda: 'return id(relay_a_target_mode).active_index() == 0;'
             then:
               - switch.turn_on: relay_a
             else:
@@ -348,13 +445,13 @@ select:
       - "Off"
     optimistic: true
     restore_value: true
-    initial_option: ${default_relay_b_target_mode}
+    initial_option: ${default_channel_b_relay_target_mode}
     entity_category: config
     on_value:
       then:
         - if:
             condition:
-              lambda: 'return id(relay_b_target_mode).state == std::string("On");'
+              lambda: 'return id(relay_b_target_mode).active_index() == 0;'
             then:
               - switch.turn_on: relay_b
             else:
@@ -362,7 +459,7 @@ select:
 
 binary_sensor:
   - platform: gpio
-    id: button_a
+    id: channel_a_button
     pin:
       number: ${button_a_gpio}
       mode: INPUT_PULLUP
@@ -371,26 +468,28 @@ binary_sensor:
       - delayed_on: ${debounce_ms}
       - delayed_off: ${debounce_ms}
     on_press:
-      - lambda: "id(a_hold_triggered) = false;"
-      - script.execute: a_hold_check
+      - lambda: 'id(channel_a_hold_triggered) = false;'
+      - script.execute: channel_a_hold_check
     on_release:
       - if:
           condition:
-            lambda: "return !id(a_hold_triggered);"
+            lambda: 'return !id(channel_a_hold_triggered);'
           then:
             - if:
                 condition:
-                  lambda: 'return std::string("${role}") == std::string("slave") && std::string("${master_button_a_entity}") != std::string("");'
+                  lambda: 'return std::string("${role}") == "slave" && std::string("${master_channel_a_state_entity}") != "";'
                 then:
-                  - homeassistant.service:
-                      service: switch.toggle
+                  - homeassistant.action:
+                      action: switch.toggle
                       data:
-                        entity_id: "${master_button_a_entity}"
+                        entity_id: "${master_channel_a_state_entity}"
                 else:
-                  - switch.toggle: button_a_state
+                  - switch.toggle: channel_a_state
+          else:
+            - script.execute: indicator_tick
 
   - platform: gpio
-    id: button_b
+    id: channel_b_button
     pin:
       number: ${button_b_gpio}
       mode: INPUT_PULLUP
@@ -400,225 +499,503 @@ binary_sensor:
       - delayed_on: ${debounce_ms}
       - delayed_off: ${debounce_ms}
     on_press:
-      - lambda: "id(b_hold_triggered) = false;"
-      - script.execute: b_hold_check
+      - lambda: 'id(channel_b_hold_triggered) = false;'
+      - script.execute: channel_b_hold_check
     on_release:
       - if:
           condition:
-            lambda: "return !id(b_hold_triggered);"
+            lambda: 'return !id(channel_b_hold_triggered);'
           then:
             - if:
                 condition:
-                  lambda: 'return std::string("${role}") == std::string("slave") && std::string("${master_button_b_entity}") != std::string("");'
+                  lambda: 'return std::string("${role}") == "slave" && std::string("${master_channel_b_state_entity}") != "";'
                 then:
-                  - homeassistant.service:
-                      service: switch.toggle
+                  - homeassistant.action:
+                      action: switch.toggle
                       data:
-                        entity_id: "${master_button_b_entity}"
+                        entity_id: "${master_channel_b_state_entity}"
                 else:
-                  - switch.toggle: button_b_state
-
-  # Peer LED sync is provided by an optional package.
+                  - switch.toggle: channel_b_state
+          else:
+            - script.execute: indicator_tick
 
 text_sensor:
-  # Mirror the master's A/B states into this device so HA state and LEDs follow master
   - platform: homeassistant
-    id: master_a_state_proxy
-    entity_id: ${master_button_a_entity}
+    id: master_channel_a_state_proxy
+    entity_id: ${master_channel_a_state_entity}
     internal: true
     on_value:
       then:
         - lambda: |-
-            if (std::string("${role}") != "slave" || std::string("${master_button_a_entity}") == std::string("")) {
+            if (std::string("${role}") != "slave" || std::string("${master_channel_a_state_entity}") == "") {
               return;
             }
             const std::string value(x);
             if (value != "on" && value != "off") {
-              ESP_LOGW("master_sync", "Ignoring Button A state '%s' from master", value.c_str());
+              ESP_LOGW("master_sync", "Ignoring Channel A state '%s' from master", value.c_str());
               return;
             }
             const bool is_on = (value == "on");
-            id(peer_a_on) = is_on;
-            if (id(button_a_state).state == is_on) {
+            id(channel_a_peer_on) = is_on;
+            if (id(channel_a_state).state == is_on) {
               return;
             }
-            id(button_a_suppress) = true;
+            id(channel_a_suppress) = true;
             if (is_on) {
-              id(button_a_state).turn_on();
+              id(channel_a_state).turn_on();
             } else {
-              id(button_a_state).turn_off();
+              id(channel_a_state).turn_off();
             }
-            id(button_a_suppress) = false;
+            id(channel_a_suppress) = false;
+        - script.execute: indicator_tick
 
   - platform: homeassistant
-    id: master_b_state_proxy
-    entity_id: ${master_button_b_entity}
+    id: master_channel_b_state_proxy
+    entity_id: ${master_channel_b_state_entity}
     internal: true
     on_value:
       then:
         - lambda: |-
-            if (std::string("${role}") != "slave" || std::string("${master_button_b_entity}") == std::string("")) {
+            if (std::string("${role}") != "slave" || std::string("${master_channel_b_state_entity}") == "") {
               return;
             }
             const std::string value(x);
             if (value != "on" && value != "off") {
-              ESP_LOGW("master_sync", "Ignoring Button B state '%s' from master", value.c_str());
+              ESP_LOGW("master_sync", "Ignoring Channel B state '%s' from master", value.c_str());
               return;
             }
             const bool is_on = (value == "on");
-            id(peer_b_on) = is_on;
-            if (id(button_b_state).state == is_on) {
+            id(channel_b_peer_on) = is_on;
+            if (id(channel_b_state).state == is_on) {
               return;
             }
-            id(button_b_suppress) = true;
+            id(channel_b_suppress) = true;
             if (is_on) {
-              id(button_b_state).turn_on();
+              id(channel_b_state).turn_on();
             } else {
-              id(button_b_state).turn_off();
+              id(channel_b_state).turn_off();
             }
-            id(button_b_suppress) = false;
+            id(channel_b_suppress) = false;
+        - script.execute: indicator_tick
+
+interval:
+  - interval: ${indicator_animation_tick}
+    then:
+      - script.execute: indicator_tick
 
 script:
-  - id: a_hold_blink
+  - id: indicator_reset_animation
     mode: restart
     then:
-      - while:
-          condition:
-            binary_sensor.is_on: button_a
-          then:
-            # Heartbeat pattern: short pulse, slightly longer pulse, then a pause
-            - light.turn_on: blue_led
-            - delay: 70ms
-            - light.turn_off: blue_led
-            - delay: 90ms
-            - light.turn_on: blue_led
-            - delay: 160ms
-            - light.turn_off: blue_led
-            - delay: 580ms
-      - light.turn_off: blue_led
+      - lambda: |-
+          id(indicator_anim_level) = 0.0f;
+          id(indicator_anim_rising) = true;
+          id(indicator_hold_phase) = 0;
 
-  - id: a_hold_check
+  - id: seed_indicator_profiles
+    mode: restart
+    then:
+      - lambda: |-
+          auto seed_profile = [&](esphome::light::LightState *profile, bool state, float brightness, float red, float green, float blue) {
+            auto call = profile->turn_on();
+            call.set_state(state);
+            call.set_brightness(brightness);
+            call.set_rgb(red, green, blue);
+            call.perform();
+          };
+          seed_profile(id(indicator_a_on_config), true, 1.0f, 0.0f, 1.0f, 0.0f);
+          seed_profile(id(indicator_a_connecting_config), true, 1.0f, 0.0f, 0.0f, 1.0f);
+          seed_profile(id(indicator_a_hold_config), true, 1.0f, 0.0f, 0.0f, 1.0f);
+          seed_profile(id(indicator_b_on_config), true, 1.0f, 0.0f, 1.0f, 0.0f);
+          seed_profile(id(indicator_b_connecting_config), false, 1.0f, 0.0f, 0.0f, 1.0f);
+          seed_profile(id(indicator_b_hold_config), true, 1.0f, 0.0f, 0.0f, 1.0f);
+      - lambda: 'id(seed_indicator_profiles_on_boot) = false;'
+      - script.execute: indicator_reset_animation
+      - script.execute: indicator_tick
+
+  - id: indicator_tick
+    mode: restart
+    then:
+      - lambda: |-
+          auto clamp01 = [](float value) -> float {
+            if (value < 0.0f) return 0.0f;
+            if (value > 1.0f) return 1.0f;
+            return value;
+          };
+          auto set_segment = [&](esphome::light::LightState *segment, float brightness, float red, float green, float blue) {
+            const float scaled = clamp01(brightness);
+            if (scaled <= 0.0f) {
+              auto call = segment->turn_off();
+              call.perform();
+              return;
+            }
+            auto call = segment->turn_on();
+            call.set_brightness(scaled);
+            call.set_rgb(
+              clamp01(red / 255.0f),
+              clamp01(green / 255.0f),
+              clamp01(blue / 255.0f)
+            );
+            call.perform();
+          };
+          auto set_off = [&](esphome::light::LightState *segment) {
+            auto call = segment->turn_off();
+            call.perform();
+          };
+
+          const bool a_on_enabled = id(indicator_a_on_config)->remote_values.is_on();
+          const float a_on_brightness = a_on_enabled ? id(indicator_a_on_config)->remote_values.get_brightness() : 0.0f;
+          const float a_on_red = a_on_enabled ? id(indicator_a_on_config)->remote_values.get_red() * 255.0f : 0.0f;
+          const float a_on_green = a_on_enabled ? id(indicator_a_on_config)->remote_values.get_green() * 255.0f : 0.0f;
+          const float a_on_blue = a_on_enabled ? id(indicator_a_on_config)->remote_values.get_blue() * 255.0f : 0.0f;
+
+          const bool a_connecting_enabled = id(indicator_a_connecting_config)->remote_values.is_on();
+          const float a_connecting_brightness = a_connecting_enabled ? id(indicator_a_connecting_config)->remote_values.get_brightness() : 0.0f;
+          const float a_connecting_red = a_connecting_enabled ? id(indicator_a_connecting_config)->remote_values.get_red() * 255.0f : 0.0f;
+          const float a_connecting_green = a_connecting_enabled ? id(indicator_a_connecting_config)->remote_values.get_green() * 255.0f : 0.0f;
+          const float a_connecting_blue = a_connecting_enabled ? id(indicator_a_connecting_config)->remote_values.get_blue() * 255.0f : 0.0f;
+
+          const bool a_hold_enabled = id(indicator_a_hold_config)->remote_values.is_on();
+          const float a_hold_brightness = a_hold_enabled ? id(indicator_a_hold_config)->remote_values.get_brightness() : 0.0f;
+          const float a_hold_red = a_hold_enabled ? id(indicator_a_hold_config)->remote_values.get_red() * 255.0f : 0.0f;
+          const float a_hold_green = a_hold_enabled ? id(indicator_a_hold_config)->remote_values.get_green() * 255.0f : 0.0f;
+          const float a_hold_blue = a_hold_enabled ? id(indicator_a_hold_config)->remote_values.get_blue() * 255.0f : 0.0f;
+
+          const bool b_on_enabled = id(indicator_b_on_config)->remote_values.is_on();
+          const float b_on_brightness = b_on_enabled ? id(indicator_b_on_config)->remote_values.get_brightness() : 0.0f;
+          const float b_on_red = b_on_enabled ? id(indicator_b_on_config)->remote_values.get_red() * 255.0f : 0.0f;
+          const float b_on_green = b_on_enabled ? id(indicator_b_on_config)->remote_values.get_green() * 255.0f : 0.0f;
+          const float b_on_blue = b_on_enabled ? id(indicator_b_on_config)->remote_values.get_blue() * 255.0f : 0.0f;
+
+          const bool b_connecting_enabled = id(indicator_b_connecting_config)->remote_values.is_on();
+          const float b_connecting_brightness = b_connecting_enabled ? id(indicator_b_connecting_config)->remote_values.get_brightness() : 0.0f;
+          const float b_connecting_red = b_connecting_enabled ? id(indicator_b_connecting_config)->remote_values.get_red() * 255.0f : 0.0f;
+          const float b_connecting_green = b_connecting_enabled ? id(indicator_b_connecting_config)->remote_values.get_green() * 255.0f : 0.0f;
+          const float b_connecting_blue = b_connecting_enabled ? id(indicator_b_connecting_config)->remote_values.get_blue() * 255.0f : 0.0f;
+
+          const bool b_hold_enabled = id(indicator_b_hold_config)->remote_values.is_on();
+          const float b_hold_brightness = b_hold_enabled ? id(indicator_b_hold_config)->remote_values.get_brightness() : 0.0f;
+          const float b_hold_red = b_hold_enabled ? id(indicator_b_hold_config)->remote_values.get_red() * 255.0f : 0.0f;
+          const float b_hold_green = b_hold_enabled ? id(indicator_b_hold_config)->remote_values.get_green() * 255.0f : 0.0f;
+          const float b_hold_blue = b_hold_enabled ? id(indicator_b_hold_config)->remote_values.get_blue() * 255.0f : 0.0f;
+
+          const bool logical_a_on = id(channel_a_state).state || id(channel_a_peer_on);
+          const bool logical_b_on = id(channel_b_state).state || id(channel_b_peer_on);
+          const bool a_holding = id(channel_a_hold_triggered) && id(channel_a_button).state;
+          const bool b_holding = id(channel_b_hold_triggered) && id(channel_b_button).state;
+          const bool any_holding = a_holding || b_holding;
+
+          const int hold_phase = id(indicator_hold_phase);
+          const bool hold_flash_on = (hold_phase == 0 || hold_phase == 2 || hold_phase == 3);
+          if (any_holding) {
+            id(indicator_hold_phase) = (hold_phase + 1) % 8;
+          } else {
+            id(indicator_hold_phase) = 0;
+          }
+
+          const float phase = id(indicator_anim_level);
+          auto render_pixel = [&](esphome::light::LightState *segment,
+                                  bool logical_on,
+                                  bool holding,
+                                  bool show_connecting,
+                                  float on_brightness,
+                                  float on_red,
+                                  float on_green,
+                                  float on_blue,
+                                  float hold_brightness,
+                                  float hold_red,
+                                  float hold_green,
+                                  float hold_blue,
+                                  float connecting_brightness,
+                                  float connecting_red,
+                                  float connecting_green,
+                                  float connecting_blue) {
+            if (holding) {
+              if (logical_on) {
+                if (hold_flash_on && hold_brightness > 0.0f) {
+                  set_segment(
+                    segment,
+                    1.0f,
+                    (on_red * on_brightness) + (hold_red * hold_brightness),
+                    (on_green * on_brightness) + (hold_green * hold_brightness),
+                    (on_blue * on_brightness) + (hold_blue * hold_brightness)
+                  );
+                } else if (on_brightness > 0.0f) {
+                  set_segment(segment, on_brightness, on_red, on_green, on_blue);
+                } else {
+                  set_off(segment);
+                }
+              } else if (hold_flash_on && hold_brightness > 0.0f) {
+                set_segment(segment, hold_brightness, hold_red, hold_green, hold_blue);
+              } else {
+                set_off(segment);
+              }
+              return;
+            }
+
+            if (show_connecting && !id(wifi_connected) && connecting_brightness > 0.0f) {
+              if (logical_on) {
+                const float connecting_weight = 1.0f - phase;
+                const float on_weight = phase;
+                set_segment(
+                  segment,
+                  1.0f,
+                  (connecting_red * connecting_brightness * connecting_weight) + (on_red * on_brightness * on_weight),
+                  (connecting_green * connecting_brightness * connecting_weight) + (on_green * on_brightness * on_weight),
+                  (connecting_blue * connecting_brightness * connecting_weight) + (on_blue * on_brightness * on_weight)
+                );
+              } else {
+                set_segment(segment, connecting_brightness * phase, connecting_red, connecting_green, connecting_blue);
+              }
+              return;
+            }
+
+            if (logical_on && on_brightness > 0.0f) {
+              set_segment(segment, on_brightness, on_red, on_green, on_blue);
+            } else {
+              set_off(segment);
+            }
+          };
+
+          render_pixel(
+            id(indicator_a_led),
+            logical_a_on,
+            a_holding,
+            true,
+            a_on_brightness,
+            a_on_red,
+            a_on_green,
+            a_on_blue,
+            a_hold_brightness,
+            a_hold_red,
+            a_hold_green,
+            a_hold_blue,
+            a_connecting_brightness,
+            a_connecting_red,
+            a_connecting_green,
+            a_connecting_blue
+          );
+          render_pixel(
+            id(indicator_b_led),
+            logical_b_on,
+            b_holding,
+            true,
+            b_on_brightness,
+            b_on_red,
+            b_on_green,
+            b_on_blue,
+            b_hold_brightness,
+            b_hold_red,
+            b_hold_green,
+            b_hold_blue,
+            b_connecting_brightness,
+            b_connecting_red,
+            b_connecting_green,
+            b_connecting_blue
+          );
+
+          if (!id(wifi_connected) && (a_connecting_brightness > 0.0f || b_connecting_brightness > 0.0f)) {
+            const float step = ${indicator_animation_step};
+            float next = id(indicator_anim_level) + (id(indicator_anim_rising) ? step : -step);
+            if (next >= 1.0f) {
+              next = 1.0f;
+              id(indicator_anim_rising) = false;
+            } else if (next <= 0.0f) {
+              next = 0.0f;
+              id(indicator_anim_rising) = true;
+            }
+            id(indicator_anim_level) = next;
+          }
+
+  - id: channel_a_apply_state
+    parameters:
+      target_state: bool
+    then:
+      - if:
+          condition:
+            lambda: 'return id(channel_a_busy);'
+          then:
+            - logger.log:
+                level: WARN
+                format: "[channel_a] Ignoring re-entrant state change while busy"
+          else:
+            - lambda: 'id(channel_a_busy) = true;'
+            - script.execute: indicator_reset_animation
+            - script.execute: indicator_tick
+            - if:
+                condition:
+                  lambda: 'return !id(channel_a_suppress);'
+                then:
+                  - if:
+                      condition:
+                        lambda: 'return target_state;'
+                      then:
+                        - script.execute: channel_a_on_action
+                      else:
+                        - script.execute: channel_a_off_action
+                  - if:
+                      condition:
+                        lambda: 'return id(channel_a_mode).active_index() == 0 && id(relay_a).state != target_state;'
+                      then:
+                        - lambda: 'id(relay_a).control(target_state);'
+            - lambda: 'id(channel_a_busy) = false;'
+
+  - id: channel_b_apply_state
+    parameters:
+      target_state: bool
+    then:
+      - if:
+          condition:
+            lambda: 'return id(channel_b_busy);'
+          then:
+            - logger.log:
+                level: WARN
+                format: "[channel_b] Ignoring re-entrant state change while busy"
+          else:
+            - lambda: 'id(channel_b_busy) = true;'
+            - script.execute: indicator_reset_animation
+            - script.execute: indicator_tick
+            - if:
+                condition:
+                  lambda: 'return !id(channel_b_suppress);'
+                then:
+                  - if:
+                      condition:
+                        lambda: 'return target_state;'
+                      then:
+                        - script.execute: channel_b_on_action
+                      else:
+                        - script.execute: channel_b_off_action
+                  - if:
+                      condition:
+                        lambda: 'return id(channel_b_mode).active_index() == 0 && id(relay_b).state != target_state;'
+                      then:
+                        - lambda: 'id(relay_b).control(target_state);'
+            - lambda: 'id(channel_b_busy) = false;'
+
+  - id: channel_a_hold_check
     mode: restart
     then:
       - delay: ${hold_start_ms}
       - if:
           condition:
-            binary_sensor.is_on: button_a
+            binary_sensor.is_on: channel_a_button
           then:
-            - lambda: "id(a_hold_triggered) = true;"
-            - script.execute: a_hold_blink
+            - lambda: 'id(channel_a_hold_triggered) = true;'
+            - script.execute: indicator_tick
             - if:
                 condition:
-                  lambda: 'return std::string("${role}") == std::string("slave") && std::string("${master_button_a_hold_entity}") != std::string("");'
+                  lambda: 'return std::string("${role}") == "slave" && std::string("${master_channel_a_hold_action_entity}") != "";'
                 then:
-                  - homeassistant.service:
-                      service: button.press
+                  - homeassistant.action:
+                      action: button.press
                       data:
-                        entity_id: "${master_button_a_hold_entity}"
+                        entity_id: "${master_channel_a_hold_action_entity}"
                 else:
-                  - button.press: button_a_sim_hold
+                  - button.press: channel_a_sim_hold
+          else:
+            - lambda: 'id(channel_a_hold_triggered) = false;'
 
-  - id: a_on_action
+  - id: channel_a_on_action
     then:
       - if:
           condition:
-            lambda: 'return std::string("${button_a_on_service}") != "" && std::string("${button_a_on_entity}") != "";'
+            lambda: 'return std::string("${channel_a_on_service}") != "" && std::string("${channel_a_on_entity}") != "";'
           then:
-            - homeassistant.service:
-                service: "${button_a_on_service}"
+            - homeassistant.action:
+                action: "${channel_a_on_service}"
                 data:
-                  entity_id: "${button_a_on_entity}"
+                  entity_id: "${channel_a_on_entity}"
 
-  - id: a_off_action
+  - id: channel_a_off_action
     then:
       - if:
           condition:
-            lambda: 'return std::string("${button_a_off_service}") != "" && std::string("${button_a_off_entity}") != "";'
+            lambda: 'return std::string("${channel_a_off_service}") != "" && std::string("${channel_a_off_entity}") != "";'
           then:
-            - homeassistant.service:
-                service: "${button_a_off_service}"
+            - homeassistant.action:
+                action: "${channel_a_off_service}"
                 data:
-                  entity_id: "${button_a_off_entity}"
+                  entity_id: "${channel_a_off_entity}"
 
-  - id: a_hold_action
+  - id: channel_a_hold_action
     then:
       - if:
           condition:
-            lambda: 'return std::string("${button_a_hold_service}") != "" && std::string("${button_a_hold_entity}") != "";'
+            lambda: 'return std::string("${channel_a_hold_service}") != "" && std::string("${channel_a_hold_entity}") != "";'
           then:
-            - homeassistant.service:
-                service: "${button_a_hold_service}"
+            - homeassistant.action:
+                action: "${channel_a_hold_service}"
                 data:
-                  entity_id: "${button_a_hold_entity}"
+                  entity_id: "${channel_a_hold_entity}"
 
-  - id: b_hold_blink
-    mode: restart
-    then:
-      - while:
-          condition:
-            binary_sensor.is_on: button_b
-          then:
-            # Heartbeat pattern: same as A
-            - light.turn_on: blue_led
-            - delay: 70ms
-            - light.turn_off: blue_led
-            - delay: 90ms
-            - light.turn_on: blue_led
-            - delay: 160ms
-            - light.turn_off: blue_led
-            - delay: 580ms
-      - light.turn_off: blue_led
-
-  - id: b_hold_check
+  - id: channel_b_hold_check
     mode: restart
     then:
       - delay: ${hold_start_ms}
       - if:
           condition:
-            binary_sensor.is_on: button_b
+            binary_sensor.is_on: channel_b_button
           then:
-            - lambda: "id(b_hold_triggered) = true;"
-            - script.execute: b_hold_blink
+            - lambda: 'id(channel_b_hold_triggered) = true;'
+            - script.execute: indicator_tick
             - if:
                 condition:
-                  lambda: 'return std::string("${role}") == std::string("slave") && std::string("${master_button_b_hold_entity}") != std::string("");'
+                  lambda: 'return std::string("${role}") == "slave" && std::string("${master_channel_b_hold_action_entity}") != "";'
                 then:
-                  - homeassistant.service:
-                      service: button.press
+                  - homeassistant.action:
+                      action: button.press
                       data:
-                        entity_id: "${master_button_b_hold_entity}"
+                        entity_id: "${master_channel_b_hold_action_entity}"
                 else:
-                  - button.press: button_b_sim_hold
+                  - button.press: channel_b_sim_hold
+          else:
+            - lambda: 'id(channel_b_hold_triggered) = false;'
 
-  - id: b_on_action
+  - id: channel_b_on_action
     then:
       - if:
           condition:
-            lambda: 'return std::string("${button_b_on_service}") != "" && std::string("${button_b_on_entity}") != "";'
+            lambda: 'return std::string("${channel_b_on_service}") != "" && std::string("${channel_b_on_entity}") != "";'
           then:
-            - homeassistant.service:
-                service: "${button_b_on_service}"
+            - homeassistant.action:
+                action: "${channel_b_on_service}"
                 data:
-                  entity_id: "${button_b_on_entity}"
+                  entity_id: "${channel_b_on_entity}"
 
-  - id: b_off_action
+  - id: channel_b_off_action
     then:
       - if:
           condition:
-            lambda: 'return std::string("${button_b_off_service}") != "" && std::string("${button_b_off_entity}") != "";'
+            lambda: 'return std::string("${channel_b_off_service}") != "" && std::string("${channel_b_off_entity}") != "";'
           then:
-            - homeassistant.service:
-                service: "${button_b_off_service}"
+            - homeassistant.action:
+                action: "${channel_b_off_service}"
                 data:
-                  entity_id: "${button_b_off_entity}"
+                  entity_id: "${channel_b_off_entity}"
 
-  - id: b_hold_action
+  - id: channel_b_hold_action
     then:
       - if:
           condition:
-            lambda: 'return std::string("${button_b_hold_service}") != "" && std::string("${button_b_hold_entity}") != "";'
+            lambda: 'return std::string("${channel_b_hold_service}") != "" && std::string("${channel_b_hold_entity}") != "";'
           then:
-            - homeassistant.service:
-                service: "${button_b_hold_service}"
+            - homeassistant.action:
+                action: "${channel_b_hold_service}"
                 data:
-                  entity_id: "${button_b_hold_entity}"
+                  entity_id: "${channel_b_hold_entity}"
+
+i2c:
+  sda: ${i2c_sda_gpio}
+  scl: ${i2c_scl_gpio}
+  scan: true
+  frequency: ${i2c_frequency}
+
+sensor:
+  - platform: sht4x
+    address: ${sht4x_address}
+    update_interval: ${sht4x_update_interval}
+    temperature:
+      name: "Temperature"
+    humidity:
+      name: "Humidity"

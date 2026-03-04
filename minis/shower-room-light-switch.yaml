@@ -2,29 +2,29 @@ substitutions:
   device_friendly_name: "Shower room light switch"
   device_name: "shower-room-light-switch"
 
-  button_a_on_service: "light.turn_on"
-  button_a_on_entity: "light.shower_room_ceiling_light"
+  channel_a_on_service: "light.turn_on"
+  channel_a_on_entity: "light.shower_room_ceiling_light"
 
-  button_a_off_service: "light.turn_off"
-  button_a_off_entity: "light.shower_room_ceiling_light"
+  channel_a_off_service: "light.turn_off"
+  channel_a_off_entity: "light.shower_room_ceiling_light"
 
-  button_a_hold_service: ""
-  button_a_hold_entity: ""
+  channel_a_hold_service: ""
+  channel_a_hold_entity: ""
 
-  default_mode_a: "Decoupled"
-  default_relay_a_target_mode: "On"
+  default_channel_a_mode: "Decoupled"
+  default_channel_a_relay_target_mode: "On"
 
-  button_b_on_service: ""
-  button_b_on_entity: ""
+  channel_b_on_service: ""
+  channel_b_on_entity: ""
 
-  button_b_off_service: ""
-  button_b_off_entity: ""
+  channel_b_off_service: ""
+  channel_b_off_entity: ""
 
-  button_b_hold_service: ""
-  button_b_hold_entity: ""
+  channel_b_hold_service: ""
+  channel_b_hold_entity: ""
 
-  default_mode_b: "Coupled"
-  default_relay_b_target_mode: "Off"
+  default_channel_b_mode: "Coupled"
+  default_channel_b_relay_target_mode: "Off"
 
 packages:
   remote_package:

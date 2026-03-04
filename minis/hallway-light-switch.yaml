@@ -2,17 +2,17 @@ substitutions:
   device_friendly_name: "Hallway light switch"
   device_name: "hallway-light-switch"
 
-  button_a_on_service: "light.turn_on"
-  button_a_on_entity: "light.hallway_ceiling_light"
+  channel_a_on_service: "light.turn_on"
+  channel_a_on_entity: "light.hallway_ceiling_light"
 
-  button_a_off_service: "light.turn_off"
-  button_a_off_entity: "light.hallway_ceiling_light"
+  channel_a_off_service: "light.turn_off"
+  channel_a_off_entity: "light.hallway_ceiling_light"
 
-  button_a_hold_service: ""
-  button_a_hold_entity: ""
+  channel_a_hold_service: ""
+  channel_a_hold_entity: ""
 
-  default_mode_a: "Decoupled"
-  default_relay_a_target_mode: "On"
+  default_channel_a_mode: "Decoupled"
+  default_channel_a_relay_target_mode: "On"
 
 packages:
   remote_package:
