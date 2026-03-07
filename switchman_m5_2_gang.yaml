@@ -287,6 +287,7 @@ light:
   - platform: partition
     id: indicator_a_led
     internal: true
+    gamma_correct: 1.0
     default_transition_length: 0s
     restore_mode: RESTORE_DEFAULT_OFF
     segments:
@@ -297,6 +298,7 @@ light:
   - platform: partition
     id: indicator_b_led
     internal: true
+    gamma_correct: 1.0
     default_transition_length: 0s
     restore_mode: RESTORE_DEFAULT_OFF
     segments:
@@ -309,6 +311,7 @@ light:
     id: indicator_a_on_config
     entity_category: config
     icon: mdi:palette
+    gamma_correct: 1.0
     default_transition_length: 0s
     restore_mode: RESTORE_DEFAULT_ON
     initial_state: ${indicator_a_on_profile}
@@ -324,6 +327,7 @@ light:
     id: indicator_a_connecting_config
     entity_category: config
     icon: mdi:palette
+    gamma_correct: 1.0
     default_transition_length: 0s
     restore_mode: RESTORE_DEFAULT_ON
     initial_state: ${indicator_a_connecting_profile}
@@ -339,6 +343,7 @@ light:
     id: indicator_a_hold_config
     entity_category: config
     icon: mdi:palette
+    gamma_correct: 1.0
     default_transition_length: 0s
     restore_mode: RESTORE_DEFAULT_ON
     initial_state: ${indicator_a_hold_profile}
@@ -354,6 +359,7 @@ light:
     id: indicator_b_on_config
     entity_category: config
     icon: mdi:palette
+    gamma_correct: 1.0
     default_transition_length: 0s
     restore_mode: RESTORE_DEFAULT_ON
     initial_state: ${indicator_b_on_profile}
@@ -369,6 +375,7 @@ light:
     id: indicator_b_connecting_config
     entity_category: config
     icon: mdi:palette
+    gamma_correct: 1.0
     default_transition_length: 0s
     restore_mode: RESTORE_DEFAULT_OFF
     initial_state: ${indicator_b_connecting_profile}
@@ -384,6 +391,7 @@ light:
     id: indicator_b_hold_config
     entity_category: config
     icon: mdi:palette
+    gamma_correct: 1.0
     default_transition_length: 0s
     restore_mode: RESTORE_DEFAULT_ON
     initial_state: ${indicator_b_hold_profile}
