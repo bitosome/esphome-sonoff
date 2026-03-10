@@ -3,7 +3,7 @@ substitutions:
   device_name: "switchman-m5-1g"
   device_make: "Sonoff"
   device_model: "Switchman M5 (1-Gang, WS2812)"
-  package_version: "5.0.2"
+  package_version: "5.0.3"
 
   wifi_ssid: !secret wifi_ssid
   wifi_password: !secret wifi_password
@@ -18,21 +18,21 @@ substitutions:
 
   indicator_a_on_profile:
     state: true
-    brightness: 100%
+    brightness: 10%
     red: 0%
     green: 100%
     blue: 0%
 
   indicator_a_connecting_profile:
     state: true
-    brightness: 100%
+    brightness: 10%
     red: 0%
     green: 0%
     blue: 100%
 
   indicator_a_hold_profile:
     state: true
-    brightness: 100%
+    brightness: 10%
     red: 0%
     green: 0%
     blue: 100%
