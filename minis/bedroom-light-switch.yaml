@@ -16,11 +16,11 @@ substitutions:
   role: "master"
 
 
-  sht4x_present: "on"
+  sht4x_present: true
 
 packages:
   remote_package:
     url: https://github.com/bitosome/esphome-sonoff
     ref: main
-    files: ${["switchman_m5_1_gang.yaml", "switchman_m5_sht4x.yaml"] if sht4x_present != "off" else ["switchman_m5_1_gang.yaml"]}
+    files: ${["switchman_m5_1_gang.yaml", "switchman_m5_sht4x.yaml"] if sht4x_present else ["switchman_m5_1_gang.yaml"]}
     refresh: 0s

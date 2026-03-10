@@ -2,8 +2,8 @@ substitutions:
   device_friendly_name: "Switchman M5 1G"
   device_name: "switchman-m5-1g"
   device_make: "Sonoff"
-  device_model: ${"Switchman M5 (1-Gang, WS2812 + SHT4x)" if sht4x_present != "off" else "Switchman M5 (1-Gang, WS2812)"}
-  package_version: "5.0.4"
+  device_model: ${"Switchman M5 (1-Gang, WS2812 + SHT4x)" if sht4x_present else "Switchman M5 (1-Gang, WS2812)"}
+  package_version: "5.0.5"
 
   wifi_ssid: !secret wifi_ssid
   wifi_password: !secret wifi_password
@@ -39,7 +39,7 @@ substitutions:
 
   indicator_animation_step: "0.08"
   indicator_animation_tick: 120ms
-  sht4x_present: "on"
+  sht4x_present: true
 
   channel_a_on_service: ""
   channel_a_on_entity: ""
