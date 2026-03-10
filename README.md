@@ -72,3 +72,5 @@ The available targets are:
 If you want the logical channel state to appear as a light in Home Assistant while keeping the ESPHome firmware model as a switch, use a Home Assistant template light that wraps the ESPHome switch entity.
 
 An example is provided in [home_assistant_template_lights.example.yaml](/Users/arku02/Repositories/esphome-sonoff/home_assistant_template_lights.example.yaml). Replace `switch.my_switch_channel_a_state` / `switch.my_switch_channel_b_state` with your actual entity IDs.
+
+The `channel_*_on_service`, `channel_*_off_service`, and `channel_*_hold_service` actions require the ESPHome device to be allowed to perform Home Assistant actions in the Home Assistant integration settings. If that permission is disabled, the channel state will still change but the configured Home Assistant action will fail.

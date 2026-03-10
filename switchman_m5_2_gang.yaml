@@ -3,7 +3,7 @@ substitutions:
   device_name: "switchman-m5-2g"
   device_make: "Sonoff"
   device_model: "Switchman M5 (2-Gang, WS2812)"
-  package_version: "5.0.0"
+  package_version: "5.0.2"
 
   wifi_ssid: !secret wifi_ssid
   wifi_password: !secret wifi_password
@@ -115,6 +115,8 @@ esphome:
               lambda: 'return id(seed_indicator_profiles_on_boot);'
             then:
               - script.execute: seed_indicator_profiles
+        - script.execute: relay_a_apply_target_mode
+        - script.execute: relay_b_apply_target_mode
 
 esp32:
   board: esp32dev
@@ -437,13 +439,7 @@ select:
     entity_category: config
     on_value:
       then:
-        - if:
-            condition:
-              lambda: 'return id(relay_a_target_mode).active_index() == 0;'
-            then:
-              - switch.turn_on: relay_a
-            else:
-              - switch.turn_off: relay_a
+        - script.execute: relay_a_apply_target_mode
 
   - platform: template
     id: relay_b_target_mode
@@ -457,13 +453,7 @@ select:
     entity_category: config
     on_value:
       then:
-        - if:
-            condition:
-              lambda: 'return id(relay_b_target_mode).active_index() == 0;'
-            then:
-              - switch.turn_on: relay_b
-            else:
-              - switch.turn_off: relay_b
+        - script.execute: relay_b_apply_target_mode
 
 binary_sensor:
   - platform: gpio
@@ -592,6 +582,28 @@ interval:
       - script.execute: indicator_tick
 
 script:
+  - id: relay_a_apply_target_mode
+    mode: restart
+    then:
+      - if:
+          condition:
+            lambda: 'return id(relay_a_target_mode).active_index() == 0;'
+          then:
+            - switch.turn_on: relay_a
+          else:
+            - switch.turn_off: relay_a
+
+  - id: relay_b_apply_target_mode
+    mode: restart
+    then:
+      - if:
+          condition:
+            lambda: 'return id(relay_b_target_mode).active_index() == 0;'
+          then:
+            - switch.turn_on: relay_b
+          else:
+            - switch.turn_off: relay_b
+
   - id: indicator_reset_animation
     mode: restart
     then:
@@ -914,6 +926,10 @@ script:
                 action: "${channel_a_on_service}"
                 data:
                   entity_id: "${channel_a_on_entity}"
+                on_error:
+                  - logger.log:
+                      level: WARN
+                      format: "[channel_a] Failed Home Assistant on action"
 
   - id: channel_a_off_action
     then:
@@ -925,6 +941,10 @@ script:
                 action: "${channel_a_off_service}"
                 data:
                   entity_id: "${channel_a_off_entity}"
+                on_error:
+                  - logger.log:
+                      level: WARN
+                      format: "[channel_a] Failed Home Assistant off action"
 
   - id: channel_a_hold_action
     then:
@@ -936,6 +956,10 @@ script:
                 action: "${channel_a_hold_service}"
                 data:
                   entity_id: "${channel_a_hold_entity}"
+                on_error:
+                  - logger.log:
+                      level: WARN
+                      format: "[channel_a] Failed Home Assistant hold action"
 
   - id: channel_b_hold_check
     mode: restart
@@ -970,6 +994,10 @@ script:
                 action: "${channel_b_on_service}"
                 data:
                   entity_id: "${channel_b_on_entity}"
+                on_error:
+                  - logger.log:
+                      level: WARN
+                      format: "[channel_b] Failed Home Assistant on action"
 
   - id: channel_b_off_action
     then:
@@ -981,6 +1009,10 @@ script:
                 action: "${channel_b_off_service}"
                 data:
                   entity_id: "${channel_b_off_entity}"
+                on_error:
+                  - logger.log:
+                      level: WARN
+                      format: "[channel_b] Failed Home Assistant off action"
 
   - id: channel_b_hold_action
     then:
@@ -992,6 +1024,10 @@ script:
                 action: "${channel_b_hold_service}"
                 data:
                   entity_id: "${channel_b_hold_entity}"
+                on_error:
+                  - logger.log:
+                      level: WARN
+                      format: "[channel_b] Failed Home Assistant hold action"
 
 i2c:
   sda: ${i2c_sda_gpio}
