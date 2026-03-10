@@ -47,13 +47,8 @@ substitutions:
   sht4x_remote_package: "github://bitosome/esphome-sonoff/switchman_m5_sht4x.yaml@main"
 
 packages:
-  remote_package:
-    url: https://github.com/bitosome/esphome-sonoff
-    ref: main
-    files:
-      - switchman_m5_1_gang.yaml
-    refresh: 0s
-  sht4x_package: ${sht4x_remote_package if sht4x_present else {}}
+  - "github://bitosome/esphome-sonoff/switchman_m5_1_gang.yaml@main"
+  - ${sht4x_remote_package if sht4x_present else {}}
 ```
 
 Before building locally, copy `secrets.yaml.example` to `secrets.yaml` and adjust the values.
