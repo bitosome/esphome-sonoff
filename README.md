@@ -44,15 +44,18 @@ substitutions:
   wifi_password: !secret wifi_password
   ota_password: !secret ota_password
 
-  sht4x_remote_package: "github://bitosome/esphome-sonoff/switchman_m5_sht4x.yaml@main"
-
 packages:
-  - "github://bitosome/esphome-sonoff/switchman_m5_1_gang.yaml@main"
-  - ${sht4x_remote_package if sht4x_present else {}}
+  remote_package:
+    url: https://github.com/bitosome/esphome-sonoff
+    ref: main
+    files:
+      - switchman_m5_1_gang.yaml
+      - switchman_m5_sht4x.yaml
+    refresh: 0s
 ```
 
 Before building locally, copy `secrets.yaml.example` to `secrets.yaml` and adjust the values.
-Set `sht4x_present: false` in a mini config to exclude the SHT4x package from the compiled firmware.
+Set `sht4x_present: false` in a mini config and remove `switchman_m5_sht4x.yaml` from that mini's `packages.remote_package.files` list to exclude the SHT4x package from the compiled firmware.
 
 ## Development
 Run local lint and config validation before committing:
