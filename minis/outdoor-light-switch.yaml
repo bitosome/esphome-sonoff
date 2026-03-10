@@ -28,17 +28,13 @@ substitutions:
 
   sht4x_present: true
 
-  sht4x_remote_package:
-    url: https://github.com/bitosome/esphome-sonoff
-    ref: main
-    files:
-      - switchman_m5_sht4x.yaml
-    refresh: 0s
+  sht4x_remote_package: "github://bitosome/esphome-sonoff/switchman_m5_sht4x.yaml@main"
 
 packages:
-  - url: https://github.com/bitosome/esphome-sonoff
+  remote_package:
+    url: https://github.com/bitosome/esphome-sonoff
     ref: main
     files:
       - switchman_m5_2_gang.yaml
     refresh: 0s
-  - ${sht4x_remote_package if sht4x_present else {}}
+  sht4x_package: ${sht4x_remote_package if sht4x_present else {}}
