@@ -44,12 +44,20 @@ substitutions:
   wifi_password: !secret wifi_password
   ota_password: !secret ota_password
 
-packages:
-  remote_package:
+  sht4x_remote_package:
     url: https://github.com/bitosome/esphome-sonoff
     ref: main
-    files: ${["switchman_m5_1_gang.yaml", "switchman_m5_sht4x.yaml"] if sht4x_present else ["switchman_m5_1_gang.yaml"]}
+    files:
+      - switchman_m5_sht4x.yaml
     refresh: 0s
+
+packages:
+  - url: https://github.com/bitosome/esphome-sonoff
+    ref: main
+    files:
+      - switchman_m5_1_gang.yaml
+    refresh: 0s
+  - ${sht4x_remote_package if sht4x_present else {}}
 ```
 
 Before building locally, copy `secrets.yaml.example` to `secrets.yaml` and adjust the values.
