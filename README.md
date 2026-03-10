@@ -39,6 +39,7 @@ appropriate template via `packages`. Example for the 1‑gang version:
 substitutions:
   device_friendly_name: "Entrance light switch 1"
   device_name: "entrance-light-switch-1"
+  sht4x_present: "on"
   wifi_ssid: !secret wifi_ssid
   wifi_password: !secret wifi_password
   ota_password: !secret ota_password
@@ -47,11 +48,12 @@ packages:
   remote_package:
     url: https://github.com/bitosome/esphome-sonoff
     ref: main
-    files: [switchman_m5_1_gang.yaml]
+    files: ${["switchman_m5_1_gang.yaml", "switchman_m5_sht4x.yaml"] if sht4x_present != "off" else ["switchman_m5_1_gang.yaml"]}
     refresh: 0s
 ```
 
 Before building locally, copy `secrets.yaml.example` to `secrets.yaml` and adjust the values.
+Set `sht4x_present: "off"` in a mini config to exclude the SHT4x package from the compiled firmware.
 
 ## Development
 Run local lint and config validation before committing:

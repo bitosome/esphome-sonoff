@@ -2,8 +2,8 @@ substitutions:
   device_friendly_name: "Switchman M5 1G"
   device_name: "switchman-m5-1g"
   device_make: "Sonoff"
-  device_model: "Switchman M5 (1-Gang, WS2812)"
-  package_version: "5.0.3"
+  device_model: ${"Switchman M5 (1-Gang, WS2812 + SHT4x)" if sht4x_present != "off" else "Switchman M5 (1-Gang, WS2812)"}
+  package_version: "5.0.4"
 
   wifi_ssid: !secret wifi_ssid
   wifi_password: !secret wifi_password
@@ -39,6 +39,7 @@ substitutions:
 
   indicator_animation_step: "0.08"
   indicator_animation_tick: 120ms
+  sht4x_present: "on"
 
   channel_a_on_service: ""
   channel_a_on_entity: ""
@@ -59,12 +60,6 @@ substitutions:
   master_entity_base: ""
   master_channel_a_state_entity: "switch.${master_entity_base}_channel_a_state"
   master_channel_a_hold_action_entity: "button.${master_entity_base}_channel_a_hold_action"
-
-  i2c_sda_gpio: GPIO03
-  i2c_scl_gpio: GPIO01
-  i2c_frequency: 100kHz
-  sht4x_address: "0x44"
-  sht4x_update_interval: 30s
 
 esphome:
   name: "${device_name}"
@@ -615,18 +610,3 @@ script:
                   - logger.log:
                       level: WARN
                       format: "[channel_a] Failed Home Assistant hold action"
-
-i2c:
-  sda: ${i2c_sda_gpio}
-  scl: ${i2c_scl_gpio}
-  scan: true
-  frequency: ${i2c_frequency}
-
-sensor:
-  - platform: sht4x
-    address: ${sht4x_address}
-    update_interval: ${sht4x_update_interval}
-    temperature:
-      name: "Temperature"
-    humidity:
-      name: "Humidity"

@@ -1,0 +1,21 @@
+substitutions:
+  i2c_sda_gpio: GPIO03
+  i2c_scl_gpio: GPIO01
+  i2c_frequency: 100kHz
+  sht4x_address: "0x44"
+  sht4x_update_interval: 30s
+
+i2c:
+  sda: ${i2c_sda_gpio}
+  scl: ${i2c_scl_gpio}
+  scan: true
+  frequency: ${i2c_frequency}
+
+sensor:
+  - platform: sht4x
+    address: ${sht4x_address}
+    update_interval: ${sht4x_update_interval}
+    temperature:
+      name: "Temperature"
+    humidity:
+      name: "Humidity"
