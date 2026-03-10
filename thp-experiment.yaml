@@ -3,7 +3,7 @@ substitutions:
   device_name: "thp-experiment"
   device_make: "Sonoff"
   device_model: "Switchman M5 (1-Gang, WS2812)"
-  package_version: "5.0.6"
+  package_version: "5.0.7"
 
   wifi_ssid: !secret wifi_ssid
   wifi_password: !secret wifi_password
@@ -15,26 +15,41 @@ substitutions:
   ws2812_data_gpio: GPIO18
   indicator_rgb_order: GRB
 
+  indicator_a_on_state: "true"
+  indicator_a_on_brightness: "1.0"
+  indicator_a_on_red: "0.0"
+  indicator_a_on_green: "1.0"
+  indicator_a_on_blue: "0.0"
   indicator_a_on_profile:
-    state: true
-    brightness: 100%
-    red: 0%
-    green: 100%
-    blue: 0%
+    state: ${indicator_a_on_state}
+    brightness: ${indicator_a_on_brightness}
+    red: ${indicator_a_on_red}
+    green: ${indicator_a_on_green}
+    blue: ${indicator_a_on_blue}
 
+  indicator_a_connecting_state: "true"
+  indicator_a_connecting_brightness: "1.0"
+  indicator_a_connecting_red: "0.0"
+  indicator_a_connecting_green: "0.0"
+  indicator_a_connecting_blue: "1.0"
   indicator_a_connecting_profile:
-    state: true
-    brightness: 100%
-    red: 0%
-    green: 0%
-    blue: 100%
+    state: ${indicator_a_connecting_state}
+    brightness: ${indicator_a_connecting_brightness}
+    red: ${indicator_a_connecting_red}
+    green: ${indicator_a_connecting_green}
+    blue: ${indicator_a_connecting_blue}
 
+  indicator_a_hold_state: "true"
+  indicator_a_hold_brightness: "1.0"
+  indicator_a_hold_red: "0.0"
+  indicator_a_hold_green: "0.0"
+  indicator_a_hold_blue: "1.0"
   indicator_a_hold_profile:
-    state: true
-    brightness: 100%
-    red: 0%
-    green: 0%
-    blue: 100%
+    state: ${indicator_a_hold_state}
+    brightness: ${indicator_a_hold_brightness}
+    red: ${indicator_a_hold_red}
+    green: ${indicator_a_hold_green}
+    blue: ${indicator_a_hold_blue}
 
   indicator_animation_step: "0.08"
   indicator_animation_tick: 120ms
@@ -377,9 +392,9 @@ script:
             call.set_rgb(red, green, blue);
             call.perform();
           };
-          seed_profile(id(indicator_a_on_config), true, 1.0f, 0.0f, 1.0f, 0.0f);
-          seed_profile(id(indicator_a_connecting_config), true, 1.0f, 0.0f, 0.0f, 1.0f);
-          seed_profile(id(indicator_a_hold_config), true, 1.0f, 0.0f, 0.0f, 1.0f);
+          seed_profile(id(indicator_a_on_config), ${indicator_a_on_state}, ${indicator_a_on_brightness}, ${indicator_a_on_red}, ${indicator_a_on_green}, ${indicator_a_on_blue});
+          seed_profile(id(indicator_a_connecting_config), ${indicator_a_connecting_state}, ${indicator_a_connecting_brightness}, ${indicator_a_connecting_red}, ${indicator_a_connecting_green}, ${indicator_a_connecting_blue});
+          seed_profile(id(indicator_a_hold_config), ${indicator_a_hold_state}, ${indicator_a_hold_brightness}, ${indicator_a_hold_red}, ${indicator_a_hold_green}, ${indicator_a_hold_blue});
       - lambda: 'id(seed_indicator_profiles_on_boot) = false;'
       - script.execute: indicator_reset_animation
       - script.execute: indicator_tick
