@@ -16,8 +16,6 @@ substitutions:
   role: "slave"
   master_entity_base: "living_room_light_switch_1"
 
-  sht4x_present: true
-
 packages:
   remote_package:
     url: https://github.com/bitosome/esphome-sonoff

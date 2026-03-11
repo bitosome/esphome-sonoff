@@ -15,8 +15,6 @@ substitutions:
   default_channel_a_relay_target_mode: "Off"
   role: "master"
 
-  sht4x_present: true
-
 packages:
   remote_package:
     url: https://github.com/bitosome/esphome-sonoff

@@ -1,4 +1,5 @@
 substitutions:
+  device_model_sensor_suffix: " + SHT4x"
   i2c_sda_gpio: GPIO03
   i2c_scl_gpio: GPIO01
   i2c_frequency: 100kHz

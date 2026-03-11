@@ -39,7 +39,6 @@ appropriate template via `packages`. Example for the 1‑gang version:
 substitutions:
   device_friendly_name: "Entrance light switch 1"
   device_name: "entrance-light-switch-1"
-  sht4x_present: true
   wifi_ssid: !secret wifi_ssid
   wifi_password: !secret wifi_password
   ota_password: !secret ota_password
@@ -55,7 +54,7 @@ packages:
 ```
 
 Before building locally, copy `secrets.yaml.example` to `secrets.yaml` and adjust the values.
-Set `sht4x_present: false` in a mini config and remove `switchman_m5_sht4x.yaml` from that mini's `packages.remote_package.files` list to exclude the SHT4x package from the compiled firmware.
+Include `switchman_m5_sht4x.yaml` in a mini's `packages.remote_package.files` list to build in the SHT4x sensor and add ` + SHT4x` to the device model string. Omit that file to exclude the sensor.
 
 ## Development
 Run local lint and config validation before committing:

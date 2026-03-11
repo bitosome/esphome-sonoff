@@ -26,8 +26,6 @@ substitutions:
   default_channel_b_mode: "Decoupled"
   default_channel_b_relay_target_mode: "Off"
 
-  sht4x_present: true
-
 packages:
   remote_package:
     url: https://github.com/bitosome/esphome-sonoff
