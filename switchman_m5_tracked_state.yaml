@@ -1,0 +1,167 @@
+substitutions:
+  tracked_channel_id: "a"
+  tracked_channel_label: "Channel A"
+  tracked_state_key: "tracked"
+  tracked_state_label: "Tracked State"
+  tracked_entity_id: "switch.example_channel_state"
+
+  indicator_tracked_state: "true"
+  indicator_tracked_brightness: "0.1"
+  indicator_tracked_red: "1.0"
+  indicator_tracked_green: "0.0"
+  indicator_tracked_blue: "1.0"
+  indicator_tracked_profile:
+    state: ${indicator_tracked_state}
+    brightness: ${indicator_tracked_brightness}
+    red: ${indicator_tracked_red}
+    green: ${indicator_tracked_green}
+    blue: ${indicator_tracked_blue}
+
+globals:
+  - id: channel_${tracked_channel_id}_${tracked_state_key}_on
+    type: bool
+    restore_value: false
+    initial_value: "false"
+  - id: channel_${tracked_channel_id}_${tracked_state_key}_anim_level
+    type: float
+    restore_value: false
+    initial_value: "0.0"
+  - id: channel_${tracked_channel_id}_${tracked_state_key}_anim_rising
+    type: bool
+    restore_value: false
+    initial_value: "true"
+
+light:
+  - platform: partition
+    name: "${tracked_channel_label} ${tracked_state_label} LED Color Profile"
+    id: indicator_${tracked_channel_id}_${tracked_state_key}_config
+    entity_category: config
+    icon: mdi:palette
+    gamma_correct: 1.0
+    default_transition_length: 0s
+    restore_mode: RESTORE_DEFAULT_ON
+    initial_state: ${indicator_tracked_profile}
+    on_state:
+      - script.execute: indicator_tick
+    segments:
+      - id: indicator_led
+        from: ${ "1" if tracked_channel_id == "b" else "0" }
+        to: ${ "1" if tracked_channel_id == "b" else "0" }
+
+text_sensor:
+  - platform: homeassistant
+    id: tracked_${tracked_channel_id}_${tracked_state_key}_proxy
+    entity_id: ${tracked_entity_id}
+    internal: true
+    on_value:
+      then:
+        - lambda: |-
+            const std::string value(x);
+            if (value != "on" && value != "off") {
+              ESP_LOGW("tracked_state", "Ignoring tracked state '%s' for %s", value.c_str(), "${tracked_entity_id}");
+              return;
+            }
+            id(channel_${tracked_channel_id}_${tracked_state_key}_on) = (value == "on");
+        - script.execute: indicator_reset_animation
+        - script.execute: indicator_tick
+
+script:
+  - id: !extend indicator_reset_animation
+    then:
+      - lambda: |-
+          id(channel_${tracked_channel_id}_${tracked_state_key}_anim_level) = 0.0f;
+          id(channel_${tracked_channel_id}_${tracked_state_key}_anim_rising) = true;
+
+  - id: !extend seed_indicator_profiles
+    then:
+      - lambda: |-
+          auto call = id(indicator_${tracked_channel_id}_${tracked_state_key}_config).turn_on();
+          call.set_state(${indicator_tracked_state});
+          call.set_brightness(${indicator_tracked_brightness});
+          call.set_rgb(${indicator_tracked_red}, ${indicator_tracked_green}, ${indicator_tracked_blue});
+          call.perform();
+
+  - id: !extend indicator_tick
+    then:
+      - lambda: |-
+          auto clamp01 = [](float value) -> float {
+            if (value < 0.0f) return 0.0f;
+            if (value > 1.0f) return 1.0f;
+            return value;
+          };
+          auto set_segment = [&](esphome::light::LightState *segment, float brightness, float red, float green, float blue) {
+            const float scaled = clamp01(brightness);
+            if (scaled <= 0.0f) {
+              auto call = segment->turn_off();
+              call.perform();
+              return;
+            }
+            auto call = segment->turn_on();
+            call.set_brightness(scaled);
+            call.set_rgb(
+              clamp01(red / 255.0f),
+              clamp01(green / 255.0f),
+              clamp01(blue / 255.0f)
+            );
+            call.perform();
+          };
+
+          if (id(channel_${tracked_channel_id}_hold_triggered) && id(channel_${tracked_channel_id}_button).state) {
+            return;
+          }
+
+          const bool connecting_enabled = id(indicator_${tracked_channel_id}_connecting_config)->remote_values.is_on();
+          const float connecting_brightness = connecting_enabled ? id(indicator_${tracked_channel_id}_connecting_config)->remote_values.get_brightness() : 0.0f;
+          if (!id(wifi_connected) && connecting_brightness > 0.0f) {
+            return;
+          }
+
+          const bool channel_enabled = id(indicator_${tracked_channel_id}_on_config)->remote_values.is_on();
+          const float channel_brightness = channel_enabled ? id(indicator_${tracked_channel_id}_on_config)->remote_values.get_brightness() : 0.0f;
+          const float channel_red = channel_enabled ? id(indicator_${tracked_channel_id}_on_config)->remote_values.get_red() * 255.0f : 0.0f;
+          const float channel_green = channel_enabled ? id(indicator_${tracked_channel_id}_on_config)->remote_values.get_green() * 255.0f : 0.0f;
+          const float channel_blue = channel_enabled ? id(indicator_${tracked_channel_id}_on_config)->remote_values.get_blue() * 255.0f : 0.0f;
+
+          const bool tracked_enabled = id(indicator_${tracked_channel_id}_${tracked_state_key}_config)->remote_values.is_on();
+          const float tracked_brightness = tracked_enabled ? id(indicator_${tracked_channel_id}_${tracked_state_key}_config)->remote_values.get_brightness() : 0.0f;
+          const float tracked_red = tracked_enabled ? id(indicator_${tracked_channel_id}_${tracked_state_key}_config)->remote_values.get_red() * 255.0f : 0.0f;
+          const float tracked_green = tracked_enabled ? id(indicator_${tracked_channel_id}_${tracked_state_key}_config)->remote_values.get_green() * 255.0f : 0.0f;
+          const float tracked_blue = tracked_enabled ? id(indicator_${tracked_channel_id}_${tracked_state_key}_config)->remote_values.get_blue() * 255.0f : 0.0f;
+
+          const bool channel_on = id(channel_${tracked_channel_id}_state).state || id(channel_${tracked_channel_id}_peer_on);
+          const bool tracked_on = id(channel_${tracked_channel_id}_${tracked_state_key}_on);
+
+          if (!tracked_on || tracked_brightness <= 0.0f) {
+            id(channel_${tracked_channel_id}_${tracked_state_key}_anim_level) = 0.0f;
+            id(channel_${tracked_channel_id}_${tracked_state_key}_anim_rising) = true;
+            return;
+          }
+
+          if (!channel_on || channel_brightness <= 0.0f) {
+            id(channel_${tracked_channel_id}_${tracked_state_key}_anim_level) = 0.0f;
+            id(channel_${tracked_channel_id}_${tracked_state_key}_anim_rising) = true;
+            set_segment(id(indicator_${tracked_channel_id}_led), tracked_brightness, tracked_red, tracked_green, tracked_blue);
+            return;
+          }
+
+          const float phase = id(channel_${tracked_channel_id}_${tracked_state_key}_anim_level);
+          const float channel_weight = 1.0f - phase;
+          const float tracked_weight = phase;
+          set_segment(
+            id(indicator_${tracked_channel_id}_led),
+            1.0f,
+            (channel_red * channel_brightness * channel_weight) + (tracked_red * tracked_brightness * tracked_weight),
+            (channel_green * channel_brightness * channel_weight) + (tracked_green * tracked_brightness * tracked_weight),
+            (channel_blue * channel_brightness * channel_weight) + (tracked_blue * tracked_brightness * tracked_weight)
+          );
+
+          const float step = ${indicator_animation_step};
+          float next = phase + (id(channel_${tracked_channel_id}_${tracked_state_key}_anim_rising) ? step : -step);
+          if (next >= 1.0f) {
+            next = 1.0f;
+            id(channel_${tracked_channel_id}_${tracked_state_key}_anim_rising) = false;
+          } else if (next <= 0.0f) {
+            next = 0.0f;
+            id(channel_${tracked_channel_id}_${tracked_state_key}_anim_rising) = true;
+          }
+          id(channel_${tracked_channel_id}_${tracked_state_key}_anim_level) = next;

@@ -1,11 +1,11 @@
 substitutions:
-  device_friendly_name: "Switchman M5 2G"
-  device_name: "switchman-m5-2g"
+  device_friendly_name: "Switchman M5-2C"
+  device_name: "switchman-m5-2c"
   device_make: "Sonoff"
-  device_model_base: "Switchman M5-2C-86, WS2812"
+  device_model_base: "Switchman M5-2C, WS2812"
   device_model_sensor_suffix: ""
   device_model: "${device_model_base}${device_model_sensor_suffix}"
-  package_version: "6.0.0"
+  package_version: "7.0.0"
 
   wifi_ssid: !secret wifi_ssid
   wifi_password: !secret wifi_password
@@ -302,7 +302,7 @@ light:
   - platform: esp32_rmt_led_strip
     id: indicator_led
     internal: true
-    # Both LEDs share one pad/pin: first LED DIN from this pin, first LED DOUT to second LED DIN.
+    # Both channel LEDs share one pad/pin: Channel A LED DIN from this pin, Channel A LED DOUT to Channel B LED DIN.
     pin: ${ws2812_data_gpio}
     chipset: WS2812
     num_leds: 2

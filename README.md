@@ -9,6 +9,7 @@ flashing and experimentation.
 ## Features
 - Coupled/decoupled modes with automatic WS2812 LED indicator synchronisation
 - Home Assistant configurable LED colors and brightness for on, connecting, and hold states
+- Optional tracked-state LED package for mirroring another Home Assistant entity on a channel LED
 - SHT4X temperature and humidity sensor support
 - Placeholder secrets and linting defaults for safer configuration management
 - Local `make lint` checks for YAML linting and ESPHome config validation
@@ -26,6 +27,8 @@ flashing and experimentation.
 
 - Indicator LEDs mirror the configured channel logic (Coupled vs Decoupled).
 - The LED state colors are configurable from Home Assistant for `on`, `connecting`, and `hold`.
+- The optional tracked-state package adds an extra config light per tracked entity so its brightness and color can be tuned independently.
+- When a tracked entity and the local channel are both on, the LED smoothly crossfades between the channel profile and the tracked-state profile.
 - The `Channel ... LED Color Profile` entities are config lights. Their toggle enables or disables that visual profile; it does not report whether the physical LED is currently lit.
 - On 2-gang devices, channel A and channel B have separate on/hold color profiles and separate connecting profiles. Channel B's connecting profile is exposed but defaults to disabled, so only channel A shows the Wi-Fi connecting animation until you enable Channel B's connecting profile.
 - The default color settings are grouped as per-profile YAML dictionaries in `substitutions`, so each profile can be overridden as one logical block.
@@ -55,6 +58,28 @@ packages:
 
 Before building locally, copy `secrets.yaml.example` to `secrets.yaml` and adjust the values.
 Include `switchman_m5_sht4x.yaml` in a mini's `packages.remote_package.files` list to build in the SHT4x sensor and add ` + SHT4x` to the device model string. Omit that file to exclude the sensor.
+
+To mirror the state of another Home Assistant entity on a channel LED, include `switchman_m5_tracked_state.yaml` as an additional package entry with `path` and `vars`:
+
+```yaml
+packages:
+  remote_package:
+    url: https://github.com/bitosome/esphome-sonoff
+    ref: main
+    files:
+      - switchman_m5_1_gang.yaml
+      - path: switchman_m5_tracked_state.yaml
+        vars:
+          tracked_channel_id: "a"
+          tracked_channel_label: "Channel A"
+          tracked_state_key: "mirror"
+          tracked_state_label: "Mirror Light"
+          tracked_entity_id: "switch.wc_2_mirror_light_switch_channel_a_state"
+    refresh: 0s
+```
+
+Add the tracked-state package once per channel LED you want to augment. This allows multiple tracked-state overlays in one device config, for example one package entry for Channel A LED and another for Channel B LED.
+The package maps the logical channel internally, so the mini config only needs to specify `tracked_channel_id`.
 
 ## Development
 Run local lint and config validation before committing:
