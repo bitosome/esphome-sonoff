@@ -1,4 +1,4 @@
-substitutions:
+defaults:
   tracked_entity_id: "switch.example_channel_state"
   tracked_entity_object_id: ${ tracked_entity_id.split('.', 1)[1] if '.' in tracked_entity_id else tracked_entity_id }
   display_channel_id: "a"
