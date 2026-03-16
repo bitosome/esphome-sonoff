@@ -109,12 +109,14 @@ In that example:
 
 Current behavior is one tracked entity per display channel LED. If you include multiple tracked-state entries that all target the same `display_channel_id`, the renderer does not blend them together.
 
+The generated Home Assistant config light is named per display channel, for example `Channel A Tracked State LED Color Profile`.
+
 Tracked-state variables:
 
 - `tracked_entity_id`: The Home Assistant entity whose on/off state should be displayed.
 - `display_channel_id`: Which local channel LED should display that tracked state. This cannot be derived safely from `tracked_entity_id`, because the tracked entity name does not tell the package whether you want it rendered on Channel A LED or Channel B LED.
 
-The package derives both the user-facing label and the internal ESPHome IDs from the tracked entity object id automatically. For example, `switch.wc_2_mirror_light_switch_channel_a_state` becomes a label like `Wc 2 Mirror Light Switch Channel A State`.
+The package derives its internal ESPHome IDs from the tracked entity object id automatically, but the user-facing Home Assistant config light name stays channel-based.
 
 ## Development
 Run local lint and config validation before committing:

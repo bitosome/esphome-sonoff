@@ -3,7 +3,6 @@ defaults:
   tracked_entity_object_id: ${ tracked_entity_id.split('.', 1)[1] if '.' in tracked_entity_id else tracked_entity_id }
   display_channel_id: "a"
   display_channel_label: ${ "Channel B" if display_channel_id == "b" else "Channel A" }
-  tracked_state_label: ${ tracked_entity_object_id | replace("_", " ") | title }
   tracked_state_key: ${ tracked_entity_object_id | replace("-", "_") | replace("'", "") | replace(".", "_") | replace("/", "_") }
 
   indicator_tracked_state: "true"
@@ -34,7 +33,7 @@ globals:
 
 light:
   - platform: partition
-    name: "${display_channel_label} ${tracked_state_label} LED Color Profile"
+    name: "${display_channel_label} Tracked State LED Color Profile"
     id: indicator_${display_channel_id}_${tracked_state_key}_config
     entity_category: config
     icon: mdi:palette
