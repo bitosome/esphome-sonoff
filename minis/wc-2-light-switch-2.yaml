@@ -25,9 +25,6 @@ packages:
       # - switchman_m5_sht4x.yaml
       - path: switchman_m5_tracked_state.yaml
         vars:
-          tracked_channel_id: "a"
-          tracked_channel_label: "Channel A"
-          tracked_state_key: "mirror"
-          tracked_state_label: "Mirror Light"
           tracked_entity_id: "switch.wc_2_mirror_light_switch_channel_a_state"
+          display_channel_id: "a"
     refresh: 0s

@@ -70,16 +70,51 @@ packages:
       - switchman_m5_1_gang.yaml
       - path: switchman_m5_tracked_state.yaml
         vars:
-          tracked_channel_id: "a"
-          tracked_channel_label: "Channel A"
-          tracked_state_key: "mirror"
-          tracked_state_label: "Mirror Light"
           tracked_entity_id: "switch.wc_2_mirror_light_switch_channel_a_state"
+          display_channel_id: "a"
     refresh: 0s
 ```
 
 Add the tracked-state package once per channel LED you want to augment. This allows multiple tracked-state overlays in one device config, for example one package entry for Channel A LED and another for Channel B LED.
-The package maps the logical channel internally, so the mini config only needs to specify `tracked_channel_id`.
+The package maps the user-facing channel label internally from `display_channel_id`, so the mini config only needs to specify the local display channel.
+
+To configure multiple tracked entities, repeat the `switchman_m5_tracked_state.yaml` package entry once for each tracked entity you want to display.
+
+Example with multiple tracked entities on one 2-gang switch:
+
+```yaml
+packages:
+  remote_package:
+    url: https://github.com/bitosome/esphome-sonoff
+    ref: main
+    files:
+      - switchman_m5_2_gang.yaml
+
+      - path: switchman_m5_tracked_state.yaml
+        vars:
+          tracked_entity_id: "switch.wc_2_mirror_light_switch_channel_a_state"
+          display_channel_id: "a"
+
+      - path: switchman_m5_tracked_state.yaml
+        vars:
+          tracked_entity_id: "switch.wc_2_light_switch_1_channel_a_state"
+          display_channel_id: "b"
+    refresh: 0s
+```
+
+In that example:
+
+- Channel A LED displays the state of `switch.wc_2_mirror_light_switch_channel_a_state`.
+- Channel B LED displays the state of `switch.wc_2_light_switch_1_channel_a_state`.
+
+Current behavior is one tracked entity per display channel LED. If you include multiple tracked-state entries that all target the same `display_channel_id`, the renderer does not blend them together.
+
+Tracked-state variables:
+
+- `tracked_entity_id`: The Home Assistant entity whose on/off state should be displayed.
+- `display_channel_id`: Which local channel LED should display that tracked state. This cannot be derived safely from `tracked_entity_id`, because the tracked entity name does not tell the package whether you want it rendered on Channel A LED or Channel B LED.
+
+The package derives both the user-facing label and the internal ESPHome IDs from the tracked entity object id automatically. For example, `switch.wc_2_mirror_light_switch_channel_a_state` becomes a label like `Wc 2 Mirror Light Switch Channel A State`.
 
 ## Development
 Run local lint and config validation before committing:
