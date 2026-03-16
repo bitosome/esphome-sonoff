@@ -20,8 +20,8 @@ substitutions:
   channel_b_off_service: "scene.turn_on"
   channel_b_off_entity: "scene.at_home"
 
-  channel_b_hold_service: "switch.toggle"
-  channel_b_hold_entity: "switch.robot_vacuum_cleaner_switch"
+  channel_b_hold_service: "input_boolean.switch"
+  channel_b_hold_entity: "input_boolean.robot_vacuum_cleaner_full_cleaning_state"
 
   default_channel_b_mode: "Decoupled"
   default_channel_b_relay_target_mode: "Off"
@@ -31,6 +31,6 @@ packages:
     url: https://github.com/bitosome/esphome-sonoff
     ref: main
     files:
-      - switchman_m5_2_gang.yaml
-      - switchman_m5_sht4x.yaml
+      - switchman_m5_1_gang.yaml
+      # - switchman_m5_sht4x.yaml
     refresh: 0s

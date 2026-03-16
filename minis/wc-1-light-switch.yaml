@@ -20,5 +20,5 @@ packages:
     ref: main
     files:
       - switchman_m5_1_gang.yaml
-      - switchman_m5_sht4x.yaml
+      # - switchman_m5_sht4x.yaml
     refresh: 0s

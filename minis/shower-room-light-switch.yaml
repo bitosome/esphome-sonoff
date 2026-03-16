@@ -6,7 +6,7 @@ substitutions:
   channel_a_on_entity: "light.shower_room_ceiling_light"
 
   channel_a_off_service: "light.turn_off"
-  channel_a_off_entity: "light.shower_room_ceiling_light"
+  channel_a_off_entity: "light.shower_room_lights"
 
   channel_a_hold_service: ""
   channel_a_hold_entity: ""
@@ -31,6 +31,6 @@ packages:
     url: https://github.com/bitosome/esphome-sonoff
     ref: main
     files:
-      - switchman_m5_2_gang.yaml
-      - switchman_m5_sht4x.yaml
+      - switchman_m5_1_gang.yaml
+      # - switchman_m5_sht4x.yaml
     refresh: 0s

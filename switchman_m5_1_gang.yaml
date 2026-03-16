@@ -2,10 +2,10 @@ substitutions:
   device_friendly_name: "Switchman M5 1G"
   device_name: "switchman-m5-1g"
   device_make: "Sonoff"
-  device_model_base: "Switchman M5 (1-Gang, WS2812)"
+  device_model_base: "Switchman M5-1C-86, WS2812"
   device_model_sensor_suffix: ""
   device_model: "${device_model_base}${device_model_sensor_suffix}"
-  package_version: "5.0.10"
+  package_version: "6.0.0"
 
   wifi_ssid: !secret wifi_ssid
   wifi_password: !secret wifi_password

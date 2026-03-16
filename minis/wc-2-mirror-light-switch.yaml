@@ -2,17 +2,17 @@ substitutions:
   device_friendly_name: "WC 2 mirror light switch"
   device_name: "wc-2-mirror-light-switch"
 
-  channel_a_on_service: ""
-  channel_a_on_entity: ""
+  channel_a_on_service: "light.turn_on"
+  channel_a_on_entity: "light.wc_2_mirror_light"
 
-  channel_a_off_service: ""
-  channel_a_off_entity: ""
+  channel_a_off_service: "light.turn_off"
+  channel_a_off_entity: "light.wc_2_mirror_light"
 
   channel_a_hold_service: ""
   channel_a_hold_entity: ""
 
-  default_channel_a_mode: "Coupled"
-  default_channel_a_relay_target_mode: "Off"
+  default_channel_a_mode: "Decoupled"
+  default_channel_a_relay_target_mode: "On"
 
 packages:
   remote_package:
@@ -20,5 +20,5 @@ packages:
     ref: main
     files:
       - switchman_m5_1_gang.yaml
-      - switchman_m5_sht4x.yaml
+      # - switchman_m5_sht4x.yaml
     refresh: 0s

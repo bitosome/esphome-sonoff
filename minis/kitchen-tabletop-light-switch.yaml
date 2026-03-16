@@ -14,11 +14,13 @@ substitutions:
   default_channel_a_mode: "Coupled"
   default_channel_a_relay_target_mode: "Off"
 
+  sht4x_present: true
+
 packages:
   remote_package:
     url: https://github.com/bitosome/esphome-sonoff
     ref: main
     files:
       - switchman_m5_1_gang.yaml
-      - switchman_m5_sht4x.yaml
+      # - switchman_m5_sht4x.yaml
     refresh: 0s
