@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Home Assistant Entity History</title>
+  <style>
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  margin: 24px;
+  color: #1f2937;
+  background: #f9fafb;
+}
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+.card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+.meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+.meta div {
+  background: #f3f4f6;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+}
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+.legend-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+}
+code {
+  background: #f3f4f6;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+.small {
+  color: #6b7280;
+  font-size: 13px;
+}
+.chart-wrap {
+    position: relative;
+}
+.chart-tooltip {
+    position: absolute;
+    display: none;
+    min-width: 220px;
+    max-width: 320px;
+    pointer-events: none;
+    background: rgba(17, 24, 39, 0.94);
+    color: #f9fafb;
+    border-radius: 10px;
+    padding: 10px 12px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.18);
+    font-size: 13px;
+    line-height: 1.4;
+    z-index: 10;
+}
+.chart-tooltip strong {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 13px;
+}
+.chart-tooltip .muted {
+    color: #d1d5db;
+}
+</style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <h1>Home Assistant Entity History</h1>
+      <div class="meta">
+        <div><strong>Source</strong><br><code>root@192.168.0.13</code></div>
+        <div><strong>Database</strong><br><code>/config/home-assistant_v2.db</code></div>
+        <div><strong>Start</strong><br>2026-03-17 19:48</div>
+        <div><strong>End</strong><br>2026-03-17 21:48</div>
+        <div><strong>Days</strong><br>0.0833333333</div>
+      </div>
+      <div class="legend"><div class="legend-item"><span class="legend-swatch" style="background:#2563eb"></span><span>sensor.aqara_thp_6_temperature <span class="small">(6 points)</span></span></div>
+<div class="legend-item"><span class="legend-swatch" style="background:#dc2626"></span><span>sensor.wc_2_light_switch_1_temperature <span class="small">(26 points)</span></span></div></div>
+    </div>
+    <div class="card">
+            <div class="chart-wrap">
+                <svg data-start-ts="1773769709.0" data-span-ts="7199.999997" viewBox="0 0 1200 260" xmlns="http://www.w3.org/2000/svg" role="img">
+<rect x="0" y="0" width="100%" height="100%" fill="#ffffff" />
+<text x="80" y="18" font-size="16" font-weight="600" fill="#111827">sensor.aqara_thp_6_temperature, sensor.wc_2_light_switch_1_temperature</text>
+<rect x="80" y="26" width="1096" height="200" fill="#ffffff" stroke="#d1d5db" stroke-width="1" rx="6" />
+<g id="hover-group-0" visibility="hidden" pointer-events="none"><line id="hover-line-0" x1="80" y1="26" x2="80" y2="226" stroke="#6b7280" stroke-width="1.5" stroke-dasharray="4 4" opacity="0.9" /><circle id="hover-dot-0-0" cx="80" cy="26" r="4.5" fill="#2563eb" stroke="#ffffff" stroke-width="2" /><circle id="hover-dot-0-1" cx="80" cy="26" r="4.5" fill="#dc2626" stroke="#ffffff" stroke-width="2" /></g>
+<line x1="80" y1="226.00" x2="1176" y2="226.00" stroke="#e5e7eb" stroke-width="1" />
+<text x="70" y="230.00" text-anchor="end" font-size="12" fill="#6b7280">22.88</text>
+<line x1="80" y1="176.00" x2="1176" y2="176.00" stroke="#e5e7eb" stroke-width="1" />
+<text x="70" y="180.00" text-anchor="end" font-size="12" fill="#6b7280">24.07</text>
+<line x1="80" y1="126.00" x2="1176" y2="126.00" stroke="#e5e7eb" stroke-width="1" />
+<text x="70" y="130.00" text-anchor="end" font-size="12" fill="#6b7280">25.25</text>
+<line x1="80" y1="76.00" x2="1176" y2="76.00" stroke="#e5e7eb" stroke-width="1" />
+<text x="70" y="80.00" text-anchor="end" font-size="12" fill="#6b7280">26.43</text>
+<line x1="80" y1="26.00" x2="1176" y2="26.00" stroke="#e5e7eb" stroke-width="1" />
+<text x="70" y="30.00" text-anchor="end" font-size="12" fill="#6b7280">27.61</text>
+<line x1="80.00" y1="26" x2="80.00" y2="226" stroke="#f3f4f6" stroke-width="1" />
+<text x="80.00" y="244" text-anchor="middle" font-size="11" fill="#6b7280">2026-03-17 19:48</text>
+<line x1="299.20" y1="26" x2="299.20" y2="226" stroke="#f3f4f6" stroke-width="1" />
+<text x="299.20" y="244" text-anchor="middle" font-size="11" fill="#6b7280">2026-03-17 20:12</text>
+<line x1="518.40" y1="26" x2="518.40" y2="226" stroke="#f3f4f6" stroke-width="1" />
+<text x="518.40" y="244" text-anchor="middle" font-size="11" fill="#6b7280">2026-03-17 20:36</text>
+<line x1="737.60" y1="26" x2="737.60" y2="226" stroke="#f3f4f6" stroke-width="1" />
+<text x="737.60" y="244" text-anchor="middle" font-size="11" fill="#6b7280">2026-03-17 21:00</text>
+<line x1="956.80" y1="26" x2="956.80" y2="226" stroke="#f3f4f6" stroke-width="1" />
+<text x="956.80" y="244" text-anchor="middle" font-size="11" fill="#6b7280">2026-03-17 21:24</text>
+<line x1="1176.00" y1="26" x2="1176.00" y2="226" stroke="#f3f4f6" stroke-width="1" />
+<text x="1176.00" y="244" text-anchor="middle" font-size="11" fill="#6b7280">2026-03-17 21:48</text>
+<polyline fill="none" stroke="#2563eb" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" points="286.41,205.02 347.81,204.17 481.13,205.44 746.23,207.56 750.88,208.40 1051.27,212.21" />
+<circle cx="1051.27" cy="212.21" r="3.5" fill="#2563eb" />
+<polyline fill="none" stroke="#dc2626" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" points="925.19,64.52 933.82,64.29 942.96,63.16 952.09,61.92 961.22,60.11 970.36,59.77 979.49,58.08 988.62,56.95 997.76,54.92 1006.89,54.13 1016.02,52.44 1025.16,51.19 1034.29,51.08 1043.43,50.52 1052.56,49.39 1070.83,47.13 1079.96,47.02 1089.10,46.23 1098.23,45.55 1107.36,46.68 1125.63,44.20 1134.76,44.31 1143.90,43.63 1153.03,43.07 1162.17,42.05 1171.30,39.79" />
+<circle cx="1171.30" cy="39.79" r="3.5" fill="#dc2626" />
+</svg>
+                <div id="chart-tooltip" class="chart-tooltip"></div>
+            </div>
+    </div>
+  </div>
+    <script>
+        const chartPanels = [{"index": 0, "plot_left": 80, "plot_right": 1176, "plot_top": 26, "plot_bottom": 226, "plot_width": 1096, "series": [{"series_index": 0, "entity_id": "sensor.aqara_thp_6_temperature", "color": "#2563eb", "samples": [{"x": 286.41, "y": 205.02, "timestamp": "2026-03-17T18:11:04.962801+00:00", "value": 23.38}, {"x": 347.81, "y": 204.17, "timestamp": "2026-03-17T18:17:48.341148+00:00", "value": 23.4}, {"x": 481.13, "y": 205.44, "timestamp": "2026-03-17T18:32:24.174102+00:00", "value": 23.37}, {"x": 746.23, "y": 207.56, "timestamp": "2026-03-17T19:01:25.669005+00:00", "value": 23.32}, {"x": 750.88, "y": 208.4, "timestamp": "2026-03-17T19:01:56.269255+00:00", "value": 23.3}, {"x": 1051.27, "y": 212.21, "timestamp": "2026-03-17T19:34:49.625390+00:00", "value": 23.21}]}, {"series_index": 1, "entity_id": "sensor.wc_2_light_switch_1_temperature", "color": "#dc2626", "samples": [{"x": 925.19, "y": 64.52, "timestamp": "2026-03-17T19:21:01.348869+00:00", "value": 26.7036666870117}, {"x": 933.82, "y": 64.29, "timestamp": "2026-03-17T19:21:58.032149+00:00", "value": 26.7090072631836}, {"x": 942.96, "y": 63.16, "timestamp": "2026-03-17T19:22:58.051198+00:00", "value": 26.735710144043}, {"x": 952.09, "y": 61.92, "timestamp": "2026-03-17T19:23:58.046017+00:00", "value": 26.7650909423828}, {"x": 961.22, "y": 60.11, "timestamp": "2026-03-17T19:24:58.037375+00:00", "value": 26.8078155517578}, {"x": 970.36, "y": 59.77, "timestamp": "2026-03-17T19:25:58.055168+00:00", "value": 26.8158264160156}, {"x": 979.49, "y": 58.08, "timestamp": "2026-03-17T19:26:58.051563+00:00", "value": 26.8558807373047}, {"x": 988.62, "y": 56.95, "timestamp": "2026-03-17T19:27:58.057336+00:00", "value": 26.8825836181641}, {"x": 997.76, "y": 54.92, "timestamp": "2026-03-17T19:28:58.066011+00:00", "value": 26.9306488037109}, {"x": 1006.89, "y": 54.13, "timestamp": "2026-03-17T19:29:58.069797+00:00", "value": 26.9493408203125}, {"x": 1016.02, "y": 52.44, "timestamp": "2026-03-17T19:30:58.063607+00:00", "value": 26.9893951416016}, {"x": 1025.16, "y": 51.19, "timestamp": "2026-03-17T19:31:58.079121+00:00", "value": 27.0187683105469}, {"x": 1034.29, "y": 51.08, "timestamp": "2026-03-17T19:32:58.068859+00:00", "value": 27.0214385986328}, {"x": 1043.43, "y": 50.52, "timestamp": "2026-03-17T19:33:58.069609+00:00", "value": 27.0347900390625}, {"x": 1052.56, "y": 49.39, "timestamp": "2026-03-17T19:34:58.073189+00:00", "value": 27.0614929199219}, {"x": 1070.83, "y": 47.13, "timestamp": "2026-03-17T19:36:58.079145+00:00", "value": 27.1148986816406}, {"x": 1079.96, "y": 47.02, "timestamp": "2026-03-17T19:37:58.091126+00:00", "value": 27.1175689697266}, {"x": 1089.1, "y": 46.23, "timestamp": "2026-03-17T19:38:58.093386+00:00", "value": 27.1362609863281}, {"x": 1098.23, "y": 45.55, "timestamp": "2026-03-17T19:39:58.099435+00:00", "value": 27.1522827148438}, {"x": 1107.36, "y": 46.68, "timestamp": "2026-03-17T19:40:58.091180+00:00", "value": 27.1255798339844}, {"x": 1125.63, "y": 44.2, "timestamp": "2026-03-17T19:42:58.106368+00:00", "value": 27.184326171875}, {"x": 1134.76, "y": 44.31, "timestamp": "2026-03-17T19:43:58.101034+00:00", "value": 27.1816558837891}, {"x": 1143.9, "y": 43.63, "timestamp": "2026-03-17T19:44:58.107288+00:00", "value": 27.1976776123047}, {"x": 1153.03, "y": 43.07, "timestamp": "2026-03-17T19:45:58.121111+00:00", "value": 27.2110290527344}, {"x": 1162.17, "y": 42.05, "timestamp": "2026-03-17T19:46:58.117097+00:00", "value": 27.2350616455078}, {"x": 1171.3, "y": 39.79, "timestamp": "2026-03-17T19:47:58.116120+00:00", "value": 27.2884750366211}]}]}];
+        const svg = document.querySelector('svg');
+        const tooltip = document.getElementById('chart-tooltip');
+        const chartWrap = document.querySelector('.chart-wrap');
+
+        function svgPointFromEvent(event) {
+            const point = svg.createSVGPoint();
+            point.x = event.clientX;
+            point.y = event.clientY;
+            return point.matrixTransform(svg.getScreenCTM().inverse());
+        }
+
+        function findNearestSample(samples, x) {
+            if (!samples.length) return null;
+            let low = 0;
+            let high = samples.length - 1;
+            while (low < high) {
+                const mid = Math.floor((low + high) / 2);
+                if (samples[mid].x < x) {
+                    low = mid + 1;
+                } else {
+                    high = mid;
+                }
+            }
+            const candidate = samples[low];
+            const previous = samples[Math.max(0, low - 1)];
+            if (Math.abs(previous.x - x) <= Math.abs(candidate.x - x)) {
+                return previous;
+            }
+            return candidate;
+        }
+
+        function hideHover() {
+            tooltip.style.display = 'none';
+            for (const panel of chartPanels) {
+                const group = document.getElementById(`hover-group-${panel.index}`);
+                if (group) group.setAttribute('visibility', 'hidden');
+            }
+        }
+
+        function renderTooltip(rows, cursorTime, event) {
+            const rowHtml = rows.map((row) => `
+                <div><span style="color:${row.color};font-weight:600">${row.entity_id}</span>: ${Number(row.value).toFixed(3)} <span class="muted">(${new Date(row.timestamp).toLocaleString()})</span></div>
+            `).join('');
+            tooltip.innerHTML = `
+                <strong>${new Date(cursorTime).toLocaleString()}</strong>
+                ${rowHtml}
+            `;
+            tooltip.style.display = 'block';
+
+            const wrapRect = chartWrap.getBoundingClientRect();
+            const tooltipRect = tooltip.getBoundingClientRect();
+            let left = event.clientX - wrapRect.left + 16;
+            let top = event.clientY - wrapRect.top - tooltipRect.height - 16;
+            if (left + tooltipRect.width > wrapRect.width - 8) {
+                left = wrapRect.width - tooltipRect.width - 8;
+            }
+            if (top < 8) {
+                top = event.clientY - wrapRect.top + 16;
+            }
+            tooltip.style.left = `${Math.max(8, left)}px`;
+            tooltip.style.top = `${Math.max(8, top)}px`;
+        }
+
+        svg.addEventListener('mousemove', (event) => {
+            const point = svgPointFromEvent(event);
+            const activePanel = chartPanels.find((panel) =>
+                point.x >= panel.plot_left &&
+                point.x <= panel.plot_right &&
+                point.y >= panel.plot_top &&
+                point.y <= panel.plot_bottom
+            );
+
+            if (!activePanel) {
+                hideHover();
+                return;
+            }
+
+            const rows = [];
+            let hasSample = false;
+            const clampedX = Math.min(activePanel.plot_right, Math.max(activePanel.plot_left, point.x));
+            const cursorTime = svg.dataset.startTs
+                ? (Number(svg.dataset.startTs) + ((clampedX - activePanel.plot_left) / activePanel.plot_width) * Number(svg.dataset.spanTs)) * 1000
+                : Date.now();
+
+            for (const series of activePanel.series) {
+                const sample = findNearestSample(series.samples, clampedX);
+                const dot = document.getElementById(`hover-dot-${activePanel.index}-${series.series_index}`);
+                if (!sample) {
+                    if (dot) dot.setAttribute('visibility', 'hidden');
+                    continue;
+                }
+                hasSample = true;
+                rows.push({ entity_id: series.entity_id, color: series.color, value: sample.value, timestamp: sample.timestamp });
+                if (dot) {
+                    dot.setAttribute('visibility', 'visible');
+                    dot.setAttribute('cx', sample.x);
+                    dot.setAttribute('cy', sample.y);
+                }
+            }
+
+            if (!hasSample) {
+                hideHover();
+                return;
+            }
+
+            for (const panel of chartPanels) {
+                const group = document.getElementById(`hover-group-${panel.index}`);
+                if (!group) continue;
+                if (panel.index !== activePanel.index) {
+                    group.setAttribute('visibility', 'hidden');
+                    continue;
+                }
+                group.setAttribute('visibility', 'visible');
+                const line = document.getElementById(`hover-line-${panel.index}`);
+                line.setAttribute('x1', clampedX);
+                line.setAttribute('x2', clampedX);
+            }
+
+            renderTooltip(rows, cursorTime, event);
+        });
+
+        svg.addEventListener('mouseleave', hideHover);
+    </script>
+</body>
+</html>
