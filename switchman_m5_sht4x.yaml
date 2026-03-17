@@ -1,10 +1,14 @@
-substitutions:
+defaults:
   device_model_sensor_suffix: " + SHT4x"
   i2c_sda_gpio: GPIO03
   i2c_scl_gpio: GPIO01
   i2c_frequency: 100kHz
   sht4x_address: "0x44"
-  sht4x_update_interval: 30s
+  sht4x_update_interval: 60s
+  sht4x_temperature_name: "Temperature"
+  sht4x_humidity_name: "Humidity"
+  sht4x_temperature_offset: "0.0"
+  sht4x_humidity_offset: "0.0"
 
 i2c:
   sda: ${i2c_sda_gpio}
@@ -17,6 +21,10 @@ sensor:
     address: ${sht4x_address}
     update_interval: ${sht4x_update_interval}
     temperature:
-      name: "Temperature"
+      name: ${sht4x_temperature_name}
+      filters:
+        - offset: ${sht4x_temperature_offset}
     humidity:
-      name: "Humidity"
+      name: ${sht4x_humidity_name}
+      filters:
+        - offset: ${sht4x_humidity_offset}

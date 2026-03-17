@@ -20,5 +20,8 @@ packages:
     ref: main
     files:
       - switchman_m5_1_gang.yaml
-      # - switchman_m5_sht4x.yaml
+      - path: switchman_m5_sht4x.yaml
+        vars:
+          sht4x_temperature_offset: "0.0"
+          sht4x_humidity_offset: "0.0"
     refresh: 0s

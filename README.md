@@ -2,9 +2,7 @@
 
 This repository contains reusable ESPHome packages for Sonoff's SwitchMan M5 wall switches.
 It provides separate templates for the **1‑gang** and **2‑gang** models that expose common
-substitutions so each device can be configured with a small "mini" file. The only standalone
-config kept in-repo is `thp-experiment.yaml`, which is intentionally self-contained for direct
-flashing and experimentation.
+substitutions so each device can be configured with a small "mini" file.
 
 ## Features
 - Coupled/decoupled modes with automatic WS2812 LED indicator synchronisation
@@ -52,12 +50,16 @@ packages:
     ref: main
     files:
       - switchman_m5_1_gang.yaml
-      - switchman_m5_sht4x.yaml
+      - path: switchman_m5_sht4x.yaml
+        vars:
+          sht4x_temperature_offset: "-1.2"
+          sht4x_humidity_offset: "0.0"
     refresh: 0s
 ```
 
 Before building locally, copy `secrets.yaml.example` to `secrets.yaml` and adjust the values.
 Include `switchman_m5_sht4x.yaml` in a mini's `packages.remote_package.files` list to build in the SHT4x sensor and add ` + SHT4x` to the device model string. Omit that file to exclude the sensor.
+The SHT4x package exposes package vars such as `sht4x_temperature_offset`, `sht4x_humidity_offset`, and `sht4x_update_interval` so production configs can tune enclosure bias without editing the shared package.
 
 To mirror the state of another Home Assistant entity on a channel LED, include `switchman_m5_tracked_state.yaml` as an additional package entry with `path` and `vars`:
 
