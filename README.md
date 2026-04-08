@@ -61,6 +61,27 @@ Before building locally, copy `secrets.yaml.example` to `secrets.yaml` and adjus
 Include `switchman_m5_sht4x.yaml` in a mini's `packages.remote_package.files` list to build in the SHT4x sensor and add ` + SHT4x` to the device model string. Omit that file to exclude the sensor.
 The SHT4x package exposes package vars such as `sht4x_temperature_offset`, `sht4x_humidity_offset`, and `sht4x_update_interval` so production configs can tune enclosure bias without editing the shared package.
 
+### SHT4x Calibration Mapping
+
+Current Aqara THP reference to switch SHT4x calibration mapping:
+
+| Aqara THP | Reference room | Switch target |
+| --- | --- | --- |
+| Aqara THP 15 | Utility room | `utility-room-light-switch` |
+| Aqara THP 11 | Hallway | none configured |
+| Aqara THP 2 | Mira's room | `mira-s-room-light-switch` |
+| Aqara THP 5 | Kitchen | none configured |
+| Aqara THP 7 | Living room | `living-room-light-switch-1`, `living-room-light-switch-2` |
+| Aqara THP 12 | WC 1 | `wc-1-mirror-light-switch` |
+| Aqara THP 3 | Office | `office-light-switch-1` |
+| Aqara THP 13 | WC 2 | `wc-2-mirror-light-switch` |
+| Aqara THP 1 | Workshop | `workshop-light-switch` |
+| Aqara THP 10 | Entrance | `entrance-light-switch` |
+| Aqara THP 14 | Sauna | none configured |
+| Aqara THP 4 | Storeroom | `storeroom-light-switch` |
+| Aqara THP 6 | Bedroom | `wc-2-light-switch-1` |
+| Aqara THP 8 | Shower room | `wc-2-light-switch-2` |
+
 To mirror the state of another Home Assistant entity on a channel LED, include `switchman_m5_tracked_state.yaml` as an additional package entry with `path` and `vars`:
 
 ```yaml

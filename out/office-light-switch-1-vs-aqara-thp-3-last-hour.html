@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Last Hour Temperature History</title>
+  <style>
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  margin: 24px;
+  color: #1f2937;
+  background: #f9fafb;
+}
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+.card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+.meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+.meta div {
+  background: #f3f4f6;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+}
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+.legend-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+}
+code {
+  background: #f3f4f6;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+.small {
+  color: #6b7280;
+  font-size: 13px;
+}
+.chart-wrap {
+    position: relative;
+}
+.chart-tooltip {
+    position: absolute;
+    display: none;
+    min-width: 220px;
+    max-width: 320px;
+    pointer-events: none;
+    background: rgba(17, 24, 39, 0.94);
+    color: #f9fafb;
+    border-radius: 10px;
+    padding: 10px 12px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.18);
+    font-size: 13px;
+    line-height: 1.4;
+    z-index: 10;
+}
+.chart-tooltip strong {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 13px;
+}
+.chart-tooltip .muted {
+    color: #d1d5db;
+}
+.chart-tooltip .tooltip-section {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(209, 213, 219, 0.25);
+}
+</style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <h1>Last Hour Temperature History</h1>
+      <div class="meta">
+        <div><strong>Source</strong><br><code>root@192.168.0.13</code></div>
+        <div><strong>Database</strong><br><code>/config/home-assistant_v2.db</code></div>
+        <div><strong>Start</strong><br>2026-03-19 11:28</div>
+        <div><strong>End</strong><br>2026-03-19 12:28</div>
+        <div><strong>Days</strong><br>0.0416666667</div>
+      </div>
+      <div class="legend"><div class="legend-item"><span class="legend-swatch" style="background:#2563eb"></span><span>sensor.office_light_switch_1_temperature <span class="small">(58 points)</span></span></div>
+<div class="legend-item"><span class="legend-swatch" style="background:#dc2626"></span><span>sensor.aqara_thp_3_temperature <span class="small">(12 points)</span></span></div></div>
+    </div>
+    <div class="card">
+            <div class="chart-wrap">
+                <svg data-start-ts="1773912487.0" data-span-ts="3600.000003" viewBox="0 0 1200 260" xmlns="http://www.w3.org/2000/svg" role="img">
+<rect x="0" y="0" width="100%" height="100%" fill="#ffffff" />
+<text x="80" y="18" font-size="16" font-weight="600" fill="#111827">sensor.office_light_switch_1_temperature, sensor.aqara_thp_3_temperature</text>
+<rect x="80" y="26" width="1096" height="200" fill="#ffffff" stroke="#d1d5db" stroke-width="1" rx="6" />
+<g id="hover-group-0" visibility="hidden" pointer-events="none"><line id="hover-line-0" x1="80" y1="26" x2="80" y2="226" stroke="#6b7280" stroke-width="1.5" stroke-dasharray="4 4" opacity="0.9" /><circle id="hover-dot-0-0" cx="80" cy="26" r="4.5" fill="#2563eb" stroke="#ffffff" stroke-width="2" /><circle id="hover-dot-0-1" cx="80" cy="26" r="4.5" fill="#dc2626" stroke="#ffffff" stroke-width="2" /></g>
+<line x1="80" y1="226.00" x2="1176" y2="226.00" stroke="#e5e7eb" stroke-width="1" />
+<text x="70" y="230.00" text-anchor="end" font-size="12" fill="#6b7280">22.59</text>
+<line x1="80" y1="176.00" x2="1176" y2="176.00" stroke="#e5e7eb" stroke-width="1" />
+<text x="70" y="180.00" text-anchor="end" font-size="12" fill="#6b7280">23.67</text>
+<line x1="80" y1="126.00" x2="1176" y2="126.00" stroke="#e5e7eb" stroke-width="1" />
+<text x="70" y="130.00" text-anchor="end" font-size="12" fill="#6b7280">24.74</text>
+<line x1="80" y1="76.00" x2="1176" y2="76.00" stroke="#e5e7eb" stroke-width="1" />
+<text x="70" y="80.00" text-anchor="end" font-size="12" fill="#6b7280">25.82</text>
+<line x1="80" y1="26.00" x2="1176" y2="26.00" stroke="#e5e7eb" stroke-width="1" />
+<text x="70" y="30.00" text-anchor="end" font-size="12" fill="#6b7280">26.89</text>
+<line x1="80.00" y1="26" x2="80.00" y2="226" stroke="#f3f4f6" stroke-width="1" />
+<text x="80.00" y="244" text-anchor="middle" font-size="11" fill="#6b7280">2026-03-19 11:28</text>
+<line x1="299.20" y1="26" x2="299.20" y2="226" stroke="#f3f4f6" stroke-width="1" />
+<text x="299.20" y="244" text-anchor="middle" font-size="11" fill="#6b7280">2026-03-19 11:40</text>
+<line x1="518.40" y1="26" x2="518.40" y2="226" stroke="#f3f4f6" stroke-width="1" />
+<text x="518.40" y="244" text-anchor="middle" font-size="11" fill="#6b7280">2026-03-19 11:52</text>
+<line x1="737.60" y1="26" x2="737.60" y2="226" stroke="#f3f4f6" stroke-width="1" />
+<text x="737.60" y="244" text-anchor="middle" font-size="11" fill="#6b7280">2026-03-19 12:04</text>
+<line x1="956.80" y1="26" x2="956.80" y2="226" stroke="#f3f4f6" stroke-width="1" />
+<text x="956.80" y="244" text-anchor="middle" font-size="11" fill="#6b7280">2026-03-19 12:16</text>
+<line x1="1176.00" y1="26" x2="1176.00" y2="226" stroke="#f3f4f6" stroke-width="1" />
+<text x="1176.00" y="244" text-anchor="middle" font-size="11" fill="#6b7280">2026-03-19 12:28</text>
+<polyline fill="none" stroke="#2563eb" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" points="111.30,42.03 129.57,43.27 147.84,42.65 166.10,43.27 184.37,46.25 202.64,44.26 220.90,43.27 239.17,46.25 257.44,44.14 275.71,41.41 293.97,39.79 312.24,44.14 330.51,44.89 348.78,45.88 367.04,46.75 385.31,46.62 403.58,46.00 421.84,46.13 440.11,51.22 458.38,48.74 476.65,49.98 494.91,44.02 513.18,44.39 531.45,40.79 549.72,42.03 567.99,41.78 586.25,40.79 604.52,41.04 622.79,48.61 641.06,49.85 659.32,47.00 677.59,49.60 695.86,45.63 714.13,47.12 732.39,50.23 750.67,48.61 768.93,49.23 787.20,47.62 805.47,48.74 823.73,47.74 842.00,50.47 860.27,47.99 878.54,46.62 896.80,48.24 915.07,45.51 933.34,44.02 951.61,45.51 969.88,46.75 988.14,45.38 1024.67,44.02 1042.94,46.38 1061.21,43.89 1079.48,43.39 1097.74,45.75 1116.02,43.89 1134.29,45.75 1152.55,42.65 1170.81,44.02" />
+<circle cx="1170.81" cy="44.02" r="3.5" fill="#2563eb" />
+<polyline fill="none" stroke="#dc2626" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" points="463.30,212.21 629.54,208.49 712.77,207.56 716.22,208.49 723.13,207.56 726.59,208.49 733.50,207.56 736.95,206.63 740.42,205.70 743.85,207.09 747.31,206.63 761.12,207.56" />
+<circle cx="761.12" cy="207.56" r="3.5" fill="#dc2626" />
+</svg>
+                <div id="chart-tooltip" class="chart-tooltip"></div>
+            </div>
+    </div>
+  </div>
+    <script>
+        const chartPanels = [{"index": 0, "plot_left": 80, "plot_right": 1176, "plot_top": 26, "plot_bottom": 226, "plot_width": 1096, "series": [{"series_index": 0, "entity_id": "sensor.office_light_switch_1_temperature", "color": "#2563eb", "samples": [{"x": 111.3, "y": 42.03, "timestamp": "2026-03-19T09:29:49.799843+00:00", "value": 26.5487899780273}, {"x": 129.57, "y": 43.27, "timestamp": "2026-03-19T09:30:49.814787+00:00", "value": 26.522087097168}, {"x": 147.84, "y": 42.65, "timestamp": "2026-03-19T09:31:49.816260+00:00", "value": 26.5354385375977}, {"x": 166.1, "y": 43.27, "timestamp": "2026-03-19T09:32:49.813063+00:00", "value": 26.522087097168}, {"x": 184.37, "y": 46.25, "timestamp": "2026-03-19T09:33:49.818699+00:00", "value": 26.4580001831055}, {"x": 202.64, "y": 44.26, "timestamp": "2026-03-19T09:34:49.824282+00:00", "value": 26.5007247924805}, {"x": 220.9, "y": 43.27, "timestamp": "2026-03-19T09:35:49.821999+00:00", "value": 26.522087097168}, {"x": 239.17, "y": 46.25, "timestamp": "2026-03-19T09:36:49.824767+00:00", "value": 26.4580001831055}, {"x": 257.44, "y": 44.14, "timestamp": "2026-03-19T09:37:49.832116+00:00", "value": 26.5033950805664}, {"x": 275.71, "y": 41.41, "timestamp": "2026-03-19T09:38:49.830495+00:00", "value": 26.562141418457}, {"x": 293.97, "y": 39.79, "timestamp": "2026-03-19T09:39:49.830071+00:00", "value": 26.5968551635742}, {"x": 312.24, "y": 44.14, "timestamp": "2026-03-19T09:40:49.834494+00:00", "value": 26.5033950805664}, {"x": 330.51, "y": 44.89, "timestamp": "2026-03-19T09:41:49.835263+00:00", "value": 26.4873733520508}, {"x": 348.78, "y": 45.88, "timestamp": "2026-03-19T09:42:49.838601+00:00", "value": 26.4660110473633}, {"x": 367.04, "y": 46.75, "timestamp": "2026-03-19T09:43:49.833962+00:00", "value": 26.4473190307617}, {"x": 385.31, "y": 46.62, "timestamp": "2026-03-19T09:44:49.848726+00:00", "value": 26.4499893188477}, {"x": 403.58, "y": 46.0, "timestamp": "2026-03-19T09:45:49.854237+00:00", "value": 26.4633407592773}, {"x": 421.84, "y": 46.13, "timestamp": "2026-03-19T09:46:49.842699+00:00", "value": 26.4606704711914}, {"x": 440.11, "y": 51.22, "timestamp": "2026-03-19T09:47:49.845922+00:00", "value": 26.351188659668}, {"x": 458.38, "y": 48.74, "timestamp": "2026-03-19T09:48:49.856056+00:00", "value": 26.4045944213867}, {"x": 476.65, "y": 49.98, "timestamp": "2026-03-19T09:49:49.852233+00:00", "value": 26.3778915405273}, {"x": 494.91, "y": 44.02, "timestamp": "2026-03-19T09:50:49.855266+00:00", "value": 26.5060653686523}, {"x": 513.18, "y": 44.39, "timestamp": "2026-03-19T09:51:49.869055+00:00", "value": 26.4980545043945}, {"x": 531.45, "y": 40.79, "timestamp": "2026-03-19T09:52:49.870719+00:00", "value": 26.5754928588867}, {"x": 549.72, "y": 42.03, "timestamp": "2026-03-19T09:53:49.863278+00:00", "value": 26.5487899780273}, {"x": 567.99, "y": 41.78, "timestamp": "2026-03-19T09:54:49.877032+00:00", "value": 26.5541305541992}, {"x": 586.25, "y": 40.79, "timestamp": "2026-03-19T09:55:49.869744+00:00", "value": 26.5754928588867}, {"x": 604.52, "y": 41.04, "timestamp": "2026-03-19T09:56:49.886233+00:00", "value": 26.5701522827148}, {"x": 622.79, "y": 48.61, "timestamp": "2026-03-19T09:57:49.877028+00:00", "value": 26.4072647094727}, {"x": 641.06, "y": 49.85, "timestamp": "2026-03-19T09:58:49.890477+00:00", "value": 26.3805618286133}, {"x": 659.32, "y": 47.0, "timestamp": "2026-03-19T09:59:49.886050+00:00", "value": 26.4419784545898}, {"x": 677.59, "y": 49.6, "timestamp": "2026-03-19T10:00:49.896452+00:00", "value": 26.3859024047852}, {"x": 695.86, "y": 45.63, "timestamp": "2026-03-19T10:01:49.891628+00:00", "value": 26.4713516235352}, {"x": 714.13, "y": 47.12, "timestamp": "2026-03-19T10:02:49.901929+00:00", "value": 26.4393081665039}, {"x": 732.39, "y": 50.23, "timestamp": "2026-03-19T10:03:49.900166+00:00", "value": 26.3725509643555}, {"x": 750.67, "y": 48.61, "timestamp": "2026-03-19T10:04:49.920986+00:00", "value": 26.4072647094727}, {"x": 768.93, "y": 49.23, "timestamp": "2026-03-19T10:05:49.912379+00:00", "value": 26.393913269043}, {"x": 787.2, "y": 47.62, "timestamp": "2026-03-19T10:06:49.916773+00:00", "value": 26.4286270141602}, {"x": 805.47, "y": 48.74, "timestamp": "2026-03-19T10:07:49.916541+00:00", "value": 26.4045944213867}, {"x": 823.73, "y": 47.74, "timestamp": "2026-03-19T10:08:49.913945+00:00", "value": 26.4259567260742}, {"x": 842.0, "y": 50.47, "timestamp": "2026-03-19T10:09:49.921758+00:00", "value": 26.3672103881836}, {"x": 860.27, "y": 47.99, "timestamp": "2026-03-19T10:10:49.915192+00:00", "value": 26.4206161499023}, {"x": 878.54, "y": 46.62, "timestamp": "2026-03-19T10:11:49.928837+00:00", "value": 26.4499893188477}, {"x": 896.8, "y": 48.24, "timestamp": "2026-03-19T10:12:49.930646+00:00", "value": 26.4152755737305}, {"x": 915.07, "y": 45.51, "timestamp": "2026-03-19T10:13:49.922622+00:00", "value": 26.4740219116211}, {"x": 933.34, "y": 44.02, "timestamp": "2026-03-19T10:14:49.927748+00:00", "value": 26.5060653686523}, {"x": 951.61, "y": 45.51, "timestamp": "2026-03-19T10:15:49.936331+00:00", "value": 26.4740219116211}, {"x": 969.88, "y": 46.75, "timestamp": "2026-03-19T10:16:49.949972+00:00", "value": 26.4473190307617}, {"x": 988.14, "y": 45.38, "timestamp": "2026-03-19T10:17:49.950118+00:00", "value": 26.476692199707}, {"x": 1024.67, "y": 44.02, "timestamp": "2026-03-19T10:19:49.942657+00:00", "value": 26.5060653686523}, {"x": 1042.94, "y": 46.38, "timestamp": "2026-03-19T10:20:49.953720+00:00", "value": 26.4553298950195}, {"x": 1061.21, "y": 43.89, "timestamp": "2026-03-19T10:21:49.960080+00:00", "value": 26.5087356567383}, {"x": 1079.48, "y": 43.39, "timestamp": "2026-03-19T10:22:49.949568+00:00", "value": 26.519416809082}, {"x": 1097.74, "y": 45.75, "timestamp": "2026-03-19T10:23:49.957233+00:00", "value": 26.4686813354492}, {"x": 1116.02, "y": 43.89, "timestamp": "2026-03-19T10:24:49.970090+00:00", "value": 26.5087356567383}, {"x": 1134.29, "y": 45.75, "timestamp": "2026-03-19T10:25:49.982317+00:00", "value": 26.4686813354492}, {"x": 1152.55, "y": 42.65, "timestamp": "2026-03-19T10:26:49.975020+00:00", "value": 26.5354385375977}, {"x": 1170.81, "y": 44.02, "timestamp": "2026-03-19T10:27:49.968234+00:00", "value": 26.5060653686523}]}, {"series_index": 1, "entity_id": "sensor.aqara_thp_3_temperature", "color": "#dc2626", "samples": [{"x": 463.3, "y": 212.21, "timestamp": "2026-03-19T09:49:06.020504+00:00", "value": 22.89}, {"x": 629.54, "y": 208.49, "timestamp": "2026-03-19T09:58:12.051675+00:00", "value": 22.97}, {"x": 712.77, "y": 207.56, "timestamp": "2026-03-19T10:02:45.429421+00:00", "value": 22.99}, {"x": 716.22, "y": 208.49, "timestamp": "2026-03-19T10:02:56.779361+00:00", "value": 22.97}, {"x": 723.13, "y": 207.56, "timestamp": "2026-03-19T10:03:19.475279+00:00", "value": 22.99}, {"x": 726.59, "y": 208.49, "timestamp": "2026-03-19T10:03:30.826413+00:00", "value": 22.97}, {"x": 733.5, "y": 207.56, "timestamp": "2026-03-19T10:03:53.523380+00:00", "value": 22.99}, {"x": 736.95, "y": 206.63, "timestamp": "2026-03-19T10:04:04.858217+00:00", "value": 23.01}, {"x": 740.42, "y": 205.7, "timestamp": "2026-03-19T10:04:16.260664+00:00", "value": 23.03}, {"x": 743.85, "y": 207.09, "timestamp": "2026-03-19T10:04:27.544445+00:00", "value": 23.0}, {"x": 747.31, "y": 206.63, "timestamp": "2026-03-19T10:04:38.880782+00:00", "value": 23.01}, {"x": 761.12, "y": 207.56, "timestamp": "2026-03-19T10:05:24.249769+00:00", "value": 22.99}]}]}];
+        const svg = document.querySelector('svg');
+        const tooltip = document.getElementById('chart-tooltip');
+        const chartWrap = document.querySelector('.chart-wrap');
+
+        function svgPointFromEvent(event) {
+            const point = svg.createSVGPoint();
+            point.x = event.clientX;
+            point.y = event.clientY;
+            return point.matrixTransform(svg.getScreenCTM().inverse());
+        }
+
+        function findNearestSample(samples, x) {
+            if (!samples.length) return null;
+            let low = 0;
+            let high = samples.length - 1;
+            while (low < high) {
+                const mid = Math.floor((low + high) / 2);
+                if (samples[mid].x < x) {
+                    low = mid + 1;
+                } else {
+                    high = mid;
+                }
+            }
+            const candidate = samples[low];
+            const previous = samples[Math.max(0, low - 1)];
+            if (Math.abs(previous.x - x) <= Math.abs(candidate.x - x)) {
+                return previous;
+            }
+            return candidate;
+        }
+
+        function hideHover() {
+            tooltip.style.display = 'none';
+            for (const panel of chartPanels) {
+                const group = document.getElementById(`hover-group-${panel.index}`);
+                if (group) group.setAttribute('visibility', 'hidden');
+            }
+        }
+
+        function formatDelta(value) {
+            const rounded = Number(value).toFixed(3);
+            return value > 0 ? `+${rounded}` : rounded;
+        }
+
+        function buildDeltaHtml(rows) {
+            if (rows.length < 2) {
+                return '';
+            }
+
+            if (rows.length === 2) {
+                const delta = rows[1].value - rows[0].value;
+                return `
+                    <div class="tooltip-section">
+                        <div><span class="muted">Delta</span>: ${formatDelta(delta)} <span class="muted">(${rows[1].entity_id} - ${rows[0].entity_id})</span></div>
+                    </div>
+                `;
+            }
+
+            const sortedRows = [...rows].sort((left, right) => left.value - right.value);
+            const minRow = sortedRows[0];
+            const maxRow = sortedRows[sortedRows.length - 1];
+            const spread = maxRow.value - minRow.value;
+            const pairHtml = rows.slice(1).map((row) => `
+                <div><span class="muted">${row.entity_id} - ${rows[0].entity_id}</span>: ${formatDelta(row.value - rows[0].value)}</div>
+            `).join('');
+            return `
+                <div class="tooltip-section">
+                    <div><span class="muted">Spread</span>: ${formatDelta(spread)} <span class="muted">(${maxRow.entity_id} - ${minRow.entity_id})</span></div>
+                    ${pairHtml}
+                </div>
+            `;
+        }
+
+        function renderTooltip(rows, cursorTime, event) {
+            const rowHtml = rows.map((row) => `
+                <div><span style="color:${row.color};font-weight:600">${row.entity_id}</span>: ${Number(row.value).toFixed(3)} <span class="muted">(${new Date(row.timestamp).toLocaleString()})</span></div>
+            `).join('');
+            const deltaHtml = buildDeltaHtml(rows);
+            tooltip.innerHTML = `
+                <strong>${new Date(cursorTime).toLocaleString()}</strong>
+                ${rowHtml}
+                ${deltaHtml}
+            `;
+            tooltip.style.display = 'block';
+
+            const wrapRect = chartWrap.getBoundingClientRect();
+            const tooltipRect = tooltip.getBoundingClientRect();
+            let left = event.clientX - wrapRect.left + 16;
+            let top = event.clientY - wrapRect.top - tooltipRect.height - 16;
+            if (left + tooltipRect.width > wrapRect.width - 8) {
+                left = wrapRect.width - tooltipRect.width - 8;
+            }
+            if (top < 8) {
+                top = event.clientY - wrapRect.top + 16;
+            }
+            tooltip.style.left = `${Math.max(8, left)}px`;
+            tooltip.style.top = `${Math.max(8, top)}px`;
+        }
+
+        svg.addEventListener('mousemove', (event) => {
+            const point = svgPointFromEvent(event);
+            const activePanel = chartPanels.find((panel) =>
+                point.x >= panel.plot_left &&
+                point.x <= panel.plot_right &&
+                point.y >= panel.plot_top &&
+                point.y <= panel.plot_bottom
+            );
+
+            if (!activePanel) {
+                hideHover();
+                return;
+            }
+
+            const rows = [];
+            let hasSample = false;
+            const clampedX = Math.min(activePanel.plot_right, Math.max(activePanel.plot_left, point.x));
+            const cursorTime = svg.dataset.startTs
+                ? (Number(svg.dataset.startTs) + ((clampedX - activePanel.plot_left) / activePanel.plot_width) * Number(svg.dataset.spanTs)) * 1000
+                : Date.now();
+
+            for (const series of activePanel.series) {
+                const sample = findNearestSample(series.samples, clampedX);
+                const dot = document.getElementById(`hover-dot-${activePanel.index}-${series.series_index}`);
+                if (!sample) {
+                    if (dot) dot.setAttribute('visibility', 'hidden');
+                    continue;
+                }
+                hasSample = true;
+                rows.push({ entity_id: series.entity_id, color: series.color, value: sample.value, timestamp: sample.timestamp });
+                if (dot) {
+                    dot.setAttribute('visibility', 'visible');
+                    dot.setAttribute('cx', sample.x);
+                    dot.setAttribute('cy', sample.y);
+                }
+            }
+
+            if (!hasSample) {
+                hideHover();
+                return;
+            }
+
+            for (const panel of chartPanels) {
+                const group = document.getElementById(`hover-group-${panel.index}`);
+                if (!group) continue;
+                if (panel.index !== activePanel.index) {
+                    group.setAttribute('visibility', 'hidden');
+                    continue;
+                }
+                group.setAttribute('visibility', 'visible');
+                const line = document.getElementById(`hover-line-${panel.index}`);
+                line.setAttribute('x1', clampedX);
+                line.setAttribute('x2', clampedX);
+            }
+
+            renderTooltip(rows, cursorTime, event);
+        });
+
+        svg.addEventListener('mouseleave', hideHover);
+    </script>
+</body>
+</html>

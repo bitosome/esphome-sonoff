@@ -143,6 +143,11 @@ code {
 .chart-tooltip .muted {
     color: #d1d5db;
 }
+.chart-tooltip .tooltip-section {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(209, 213, 219, 0.25);
+}
 """
 
 
@@ -543,13 +548,49 @@ def render_html(
             }}
         }}
 
+        function formatDelta(value) {{
+            const rounded = Number(value).toFixed(3);
+            return value > 0 ? `+${{rounded}}` : rounded;
+        }}
+
+        function buildDeltaHtml(rows) {{
+            if (rows.length < 2) {{
+                return '';
+            }}
+
+            if (rows.length === 2) {{
+                const delta = rows[1].value - rows[0].value;
+                return `
+                    <div class="tooltip-section">
+                        <div><span class="muted">Delta</span>: ${{formatDelta(delta)}} <span class="muted">(${{rows[1].entity_id}} - ${{rows[0].entity_id}})</span></div>
+                    </div>
+                `;
+            }}
+
+            const sortedRows = [...rows].sort((left, right) => left.value - right.value);
+            const minRow = sortedRows[0];
+            const maxRow = sortedRows[sortedRows.length - 1];
+            const spread = maxRow.value - minRow.value;
+            const pairHtml = rows.slice(1).map((row) => `
+                <div><span class="muted">${{row.entity_id}} - ${{rows[0].entity_id}}</span>: ${{formatDelta(row.value - rows[0].value)}}</div>
+            `).join('');
+            return `
+                <div class="tooltip-section">
+                    <div><span class="muted">Spread</span>: ${{formatDelta(spread)}} <span class="muted">(${{maxRow.entity_id}} - ${{minRow.entity_id}})</span></div>
+                    ${{pairHtml}}
+                </div>
+            `;
+        }}
+
         function renderTooltip(rows, cursorTime, event) {{
             const rowHtml = rows.map((row) => `
                 <div><span style="color:${{row.color}};font-weight:600">${{row.entity_id}}</span>: ${{Number(row.value).toFixed(3)}} <span class="muted">(${{new Date(row.timestamp).toLocaleString()}})</span></div>
             `).join('');
+            const deltaHtml = buildDeltaHtml(rows);
             tooltip.innerHTML = `
                 <strong>${{new Date(cursorTime).toLocaleString()}}</strong>
                 ${{rowHtml}}
+                ${{deltaHtml}}
             `;
             tooltip.style.display = 'block';
 
