@@ -18,8 +18,14 @@ substitutions so each device can be configured with a small "mini" file.
 ### Button and relay interaction
 
 - Each channel exposes a virtual channel state (`channel_a_state` / `channel_b_state`) that can be decoupled from its physical relay.
-- In **Coupled** mode a button press toggles the relay and keeps the virtual state in sync.
-- In **Decoupled** mode a button press only flips the virtual state and fires the Home‑Assistant actions while the relay remains unchanged.
+- In **Coupled** mode a short button press always toggles the relay locally, including while Wi-Fi or Home Assistant is
+  unavailable. The resulting virtual channel state is published to Home Assistant when it reconnects.
+- In **Decoupled** mode a short button press only changes the virtual state and fires its Home Assistant action while Home
+  Assistant has an active state-subscription connection. Presses are ignored while Home Assistant is unavailable, so an
+  offline press cannot make the ESPHome state drift from the remotely controlled light.
+- Hold actions require Home Assistant and are ignored while it is unavailable.
+- Wi-Fi and API reboot timeouts are disabled so a prolonged network or Home Assistant outage does not interrupt local relay
+  control or briefly power-cycle always-powered smart bulbs.
 
 ### LED behaviour
 
@@ -28,7 +34,11 @@ substitutions so each device can be configured with a small "mini" file.
 - The optional tracked-state package adds an extra config light per tracked entity so its brightness and color can be tuned independently.
 - When a tracked entity and the local channel are both on, the LED smoothly crossfades between the channel profile and the tracked-state profile.
 - The `Channel ... LED Color Profile` entities are config lights. Their toggle enables or disables that visual profile; it does not report whether the physical LED is currently lit.
-- On 2-gang devices, channel A and channel B have separate on/hold color profiles and separate connecting profiles. Channel B's connecting profile is exposed but defaults to disabled, so only channel A shows the Wi-Fi connecting animation until you enable Channel B's connecting profile.
+- The connecting animation is shown whenever Wi-Fi is unavailable or no Home Assistant state-subscription connection is
+  active.
+- On 2-gang devices, channel A and channel B have separate on/hold color profiles and separate connecting profiles. Channel
+  B's connecting profile is exposed but defaults to disabled, so only channel A shows the connecting animation until you
+  enable Channel B's connecting profile.
 - The default color settings are grouped as per-profile YAML dictionaries in `substitutions`, so each profile can be overridden as one logical block.
 - LED profile defaults are automatically seeded into Home Assistant on first boot and again on OTA reflashes. After that, Home Assistant changes persist across normal reboots.
 

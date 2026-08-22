@@ -5,7 +5,7 @@ substitutions:
   device_model_base: "Switchman M5-1C, WS2812"
   device_model_sensor_suffix: ""
   device_model: "${device_model_base}${device_model_sensor_suffix}"
-  package_version: "v7.0.1.3"
+  package_version: "v8.0.1"
 
   wifi_ssid: !secret wifi_ssid
   wifi_password: !secret wifi_password
@@ -109,6 +109,7 @@ wifi:
   ssid: ${wifi_ssid}
   password: ${wifi_password}
   power_save_mode: none
+  reboot_timeout: 0s
   on_connect:
     then:
       - lambda: 'id(wifi_connected) = true;'
@@ -128,6 +129,8 @@ ota:
       - lambda: 'id(seed_indicator_profiles_on_boot) = true;'
 
 api:
+  id: api_server
+  reboot_timeout: 0s
   homeassistant_services: true
   homeassistant_states: true
 
@@ -149,6 +152,10 @@ globals:
     restore_value: false
     initial_value: "false"
   - id: wifi_connected
+    type: bool
+    restore_value: false
+    initial_value: "false"
+  - id: connection_ready
     type: bool
     restore_value: false
     initial_value: "false"
@@ -322,14 +329,30 @@ binary_sensor:
           then:
             - if:
                 condition:
-                  lambda: 'return std::string("${role}") == "slave" && std::string("${master_channel_a_state_entity}") != "";'
+                  lambda: 'return id(channel_a_mode).active_index() == 0;'
                 then:
-                  - homeassistant.action:
-                      action: switch.toggle
-                      data:
-                        entity_id: "${master_channel_a_state_entity}"
-                else:
                   - switch.toggle: channel_a_state
+                else:
+                  - if:
+                      condition:
+                        api.connected:
+                          state_subscription_only: true
+                      then:
+                        - if:
+                            condition:
+                              lambda: 'return std::string("${role}") == "slave" && std::string("${master_channel_a_state_entity}") != "";'
+                            then:
+                              - homeassistant.action:
+                                  action: switch.toggle
+                                  data:
+                                    entity_id: "${master_channel_a_state_entity}"
+                            else:
+                              - switch.toggle: channel_a_state
+                      else:
+                        - logger.log:
+                            level: WARN
+                            format: "[channel_a] Ignoring decoupled press while Home Assistant is unavailable"
+                        - script.execute: indicator_tick
           else:
             - script.execute: indicator_tick
 
@@ -455,6 +478,12 @@ script:
           const float hold_blue = hold_enabled ? id(indicator_a_hold_config)->remote_values.get_blue() * 255.0f : 0.0f;
 
           const bool logical_on = id(channel_a_state).state || id(channel_a_peer_on);
+          const bool connection_ready_now = id(wifi_connected) && id(api_server).is_connected_with_state_subscription();
+          if (id(connection_ready) != connection_ready_now) {
+            id(connection_ready) = connection_ready_now;
+            id(indicator_anim_level) = 0.0f;
+            id(indicator_anim_rising) = true;
+          }
 
           if (id(channel_a_hold_triggered) && id(channel_a_button).state) {
             const int phase = id(indicator_hold_phase);
@@ -484,7 +513,7 @@ script:
 
           id(indicator_hold_phase) = 0;
 
-          if (id(wifi_connected) || connecting_brightness <= 0.0f) {
+          if (connection_ready_now || connecting_brightness <= 0.0f) {
             if (logical_on && on_brightness > 0.0f) {
               set_segment(id(indicator_a_led), on_brightness, on_red, on_green, on_blue);
             } else {
@@ -570,14 +599,23 @@ script:
             - script.execute: indicator_tick
             - if:
                 condition:
-                  lambda: 'return std::string("${role}") == "slave" && std::string("${master_channel_a_hold_action_entity}") != "";'
+                  api.connected:
+                    state_subscription_only: true
                 then:
-                  - homeassistant.action:
-                      action: button.press
-                      data:
-                        entity_id: "${master_channel_a_hold_action_entity}"
+                  - if:
+                      condition:
+                        lambda: 'return std::string("${role}") == "slave" && std::string("${master_channel_a_hold_action_entity}") != "";'
+                      then:
+                        - homeassistant.action:
+                            action: button.press
+                            data:
+                              entity_id: "${master_channel_a_hold_action_entity}"
+                      else:
+                        - button.press: channel_a_sim_hold
                 else:
-                  - button.press: channel_a_sim_hold
+                  - logger.log:
+                      level: WARN
+                      format: "[channel_a] Ignoring hold action while Home Assistant is unavailable"
           else:
             - lambda: 'id(channel_a_hold_triggered) = false;'
 

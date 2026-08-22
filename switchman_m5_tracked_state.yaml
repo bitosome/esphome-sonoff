@@ -112,7 +112,7 @@ script:
 
           const bool connecting_enabled = id(indicator_${display_channel_id}_connecting_config)->remote_values.is_on();
           const float connecting_brightness = connecting_enabled ? id(indicator_${display_channel_id}_connecting_config)->remote_values.get_brightness() : 0.0f;
-          if (!id(wifi_connected) && connecting_brightness > 0.0f) {
+          if (!id(connection_ready) && connecting_brightness > 0.0f) {
             return;
           }
 
