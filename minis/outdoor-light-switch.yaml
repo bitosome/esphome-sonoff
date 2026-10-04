@@ -20,9 +20,9 @@ substitutions:
   channel_b_off_service: "scene.turn_on"
   channel_b_off_entity: "scene.at_home"
 
-  # HA preset wrapper: preserves its Roborock settings and enters the shared queue.
+  # Stable HA entrypoint; the selected robot preset is configured in Home Assistant.
   channel_b_hold_service: "script.turn_on"
-  channel_b_hold_entity: "script.kurwa_clean_full_cleaning"
+  channel_b_hold_entity: "script.robot_vacuum_cleaner_preset"
 
   default_channel_b_mode: "Decoupled"
   default_channel_b_relay_target_mode: "Off"
